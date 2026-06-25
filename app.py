@@ -1479,7 +1479,7 @@ with tab_backtest:
         else:
             pred_df = st.session_state["prediction_log"]
 
-        actual_df = st.session_state["actual_results"]
+            actual_df = st.session_state["actual_results"]
 
         # ----------------------------------------------------
         # Tournament Mapping
