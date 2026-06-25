@@ -1643,28 +1643,29 @@ if not prediction_actual_df.empty:
 # Loaded Data Summary
 # ----------------------------------------------------
 st.markdown("### Loaded Data Summary")
-        s1, s2 = st.columns(2)
 
-        with s1:
-            st.metric(
-                "Prediction rows",
-                len(pred_df)
+s1, s2 = st.columns(2)
+
+with s1:
+    st.metric(
+        "Prediction rows",
+        len(pred_df)
             )
 
-        with s2:
-            st.metric(
-                "Actual match rows",
-                len(actual_df)
+with s2:
+    st.metric(
+            "Actual match rows",
+            len(actual_df)
             )
 
-        st.info(
-            "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
+st.info(
+    "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
         )
 
-        st.markdown("### Next step preview")
+st.markdown("### Next step preview")
 
-        st.write("1. Filter TennisMyLife matches by tournament and year")
-        st.write("2. Count wins for each predicted player")
-        st.write("3. Calculate actual points using wins * 25")
-        st.write("4. Compare expected points vs actual points")
-        st.write("5. Calculate prediction error and efficiency ratio")
+st.write("1. Filter TennisMyLife matches by tournament and year")
+st.write("2. Count wins for each predicted player")
+st.write("3. Calculate actual points using wins * 25")
+st.write("4. Compare expected points vs actual points")
+st.write("5. Calculate prediction error and efficiency ratio")
