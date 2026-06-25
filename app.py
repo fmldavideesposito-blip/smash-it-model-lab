@@ -1623,7 +1623,7 @@ with tab_backtest:
             )
 
         
-        # ----------------------------------------------------
+# ----------------------------------------------------
         # Prediction vs Actual Global
         # ----------------------------------------------------
         st.markdown(
@@ -1672,24 +1672,14 @@ with tab_backtest:
                     )
                 )
 
-    # -----------------------------------
-    # Detail Table
-    # -----------------------------------
-    st.dataframe(
-        prediction_actual_df,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.download_button(
-        "⬇️ Download prediction_vs_actual_global.csv",
-        dataframe_to_csv_bytes(
-            prediction_actual_df
-        ),
-        file_name="prediction_vs_actual_global.csv",
-        mime="text/csv",
-        key="download_prediction_vs_actual_global"
-    )
+            # -----------------------------------
+            # Detail Table
+            # -----------------------------------
+            st.dataframe(
+                prediction_actual_df,
+                use_container_width=True,
+                hide_index=True
+            )
 
             st.download_button(
                 "⬇️ Download prediction_vs_actual_global.csv",
@@ -1712,17 +1702,17 @@ with tab_backtest:
             st.metric(
                 "Prediction rows",
                 len(pred_df)
-                    )
+            )
 
         with s2:
             st.metric(
-                    "Actual match rows",
-                    len(actual_df)
-                    )
+                "Actual match rows",
+                len(actual_df)
+            )
 
         st.info(
             "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
-                )
+        )
 
         st.markdown("### Next step preview")
 
