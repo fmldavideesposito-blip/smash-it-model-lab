@@ -35,8 +35,6 @@ def read_prediction_log(uploaded_file):
             encoding="utf-8-sig"
         )
 
-        # Se per qualche motivo viene caricata una sola colonna,
-        # prova fallback automatico con separatore virgola.
         if len(df.columns) == 1:
             uploaded_file.seek(0)
             df = pd.read_csv(
@@ -114,6 +112,31 @@ def show_dataframe_diagnostics(df: pd.DataFrame, title: str):
         )
 
 
+def dataframe_to_csv_bytes(df: pd.DataFrame) -> bytes:
+    return df.to_csv(
+        index=False,
+        sep=";",
+        decimal=",",
+        encoding="utf-8-sig"
+    ).encode("utf-8-sig")
+
+
+def ensure_numeric(df: pd.DataFrame, cols):
+    """
+    Converte in numerico le colonne indicate, se presenti.
+    """
+    out = df.copy()
+
+    for c in cols:
+        if c in out.columns:
+            out[c] = pd.to_numeric(
+                out[c],
+                errors="coerce"
+            )
+
+    return out
+
+
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
@@ -143,6 +166,25 @@ with tab_pred:
     if prediction_file:
 
         pred_df = read_prediction_log(prediction_file)
+
+        pred_df = ensure_numeric(
+            pred_df,
+            [
+                "year",
+                "budget",
+                "team_size",
+                "credits",
+                "expected_points",
+                "value_index",
+                "model_rank",
+                "players_found",
+                "matched",
+                "match_rate",
+                "q_count",
+                "wc_count",
+                "ll_count",
+            ]
+        )
 
         st.session_state["prediction_log"] = pred_df
 
@@ -196,6 +238,7 @@ with tab_pred:
                 "Prediction log format looks valid."
             )
 
+
 # ------------------------------------------------------------
 # TAB 2 — Prediction Warehouse
 # ------------------------------------------------------------
@@ -221,15 +264,32 @@ with tab_summary:
         for f in uploaded_logs:
 
             try:
-
                 df = read_prediction_log(f)
+
+                df = ensure_numeric(
+                    df,
+                    [
+                        "year",
+                        "budget",
+                        "team_size",
+                        "credits",
+                        "expected_points",
+                        "value_index",
+                        "model_rank",
+                        "players_found",
+                        "matched",
+                        "match_rate",
+                        "q_count",
+                        "wc_count",
+                        "ll_count",
+                    ]
+                )
 
                 df["source_file"] = f.name
 
                 all_logs.append(df)
 
             except Exception:
-
                 st.warning(
                     f"Unable to load {f.name}"
                 )
@@ -334,31 +394,124 @@ with tab_summary:
             )
 
             # ----------------------------------------------------
-            # Most Selected Players
+            # Most Selected Players Overall
             # ----------------------------------------------------
-            st.markdown("### Most Selected Players")
+            st.markdown("### Most Selected Players Overall")
 
-            player_summary = (
-                master_df
-                .groupby("player")
-                .agg(
-                    selections=("player", "count"),
-                    avg_expected_points=("expected_points", "mean"),
-                    avg_credits=("credits", "mean")
+            strategy_options = (
+                ["All Strategies"]
+                + sorted(master_df["strategy"].dropna().unique().tolist())
+                if "strategy" in master_df.columns
+                else ["All Strategies"]
+            )
+
+            selected_strategy_filter = st.selectbox(
+                "Filter by strategy",
+                strategy_options,
+                key="most_selected_strategy_filter"
+            )
+
+            if selected_strategy_filter != "All Strategies":
+                player_base_df = master_df[
+                    master_df["strategy"] == selected_strategy_filter
+                ].copy()
+            else:
+                player_base_df = master_df.copy()
+
+            if not player_base_df.empty:
+
+                player_summary = (
+                    player_base_df
+                    .groupby("player", dropna=False)
+                    .agg(
+                        selections=("player", "count"),
+                        tournaments_selected=("tournament", "nunique"),
+                        strategies_selected=("strategy", "nunique"),
+                        avg_expected_points=("expected_points", "mean"),
+                        total_expected_points=("expected_points", "sum"),
+                        max_expected_points=("expected_points", "max"),
+                        avg_credits=("credits", "mean"),
+                        min_credits=("credits", "min"),
+                        max_credits=("credits", "max"),
+                    )
+                    .reset_index()
                 )
-                .reset_index()
-            )
 
-            player_summary = player_summary.sort_values(
-                "selections",
-                ascending=False
-            )
+                player_summary["selection_share_pct"] = (
+                    player_summary["selections"]
+                    / len(player_base_df)
+                    * 100
+                )
 
-            st.dataframe(
-                player_summary.head(25),
-                use_container_width=True,
-                hide_index=True
-            )
+                player_summary = player_summary.sort_values(
+                    [
+                        "selections",
+                        "total_expected_points"
+                    ],
+                    ascending=[False, False]
+                )
+
+                # Formatting
+                for col in [
+                    "avg_expected_points",
+                    "total_expected_points",
+                    "max_expected_points",
+                    "avg_credits",
+                    "min_credits",
+                    "max_credits",
+                    "selection_share_pct",
+                ]:
+                    if col in player_summary.columns:
+                        player_summary[col] = player_summary[col].round(2)
+
+                c1, c2, c3 = st.columns(3)
+
+                with c1:
+                    st.metric(
+                        "Unique Players",
+                        player_summary["player"].nunique()
+                    )
+
+                with c2:
+                    top_player = (
+                        player_summary.iloc[0]["player"]
+                        if len(player_summary) > 0
+                        else "-"
+                    )
+
+                    st.metric(
+                        "Most Selected",
+                        top_player
+                    )
+
+                with c3:
+                    top_selections = (
+                        int(player_summary.iloc[0]["selections"])
+                        if len(player_summary) > 0
+                        else 0
+                    )
+
+                    st.metric(
+                        "Top Selections",
+                        top_selections
+                    )
+
+                st.dataframe(
+                    player_summary,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                st.download_button(
+                    "⬇️ Download most_selected_players.csv",
+                    dataframe_to_csv_bytes(player_summary),
+                    file_name="most_selected_players.csv",
+                    mime="text/csv",
+                    key="download_most_selected_players"
+                )
+
+            else:
+                st.info("No player data available for the selected strategy.")
 
             # ----------------------------------------------------
             # Strategy Snapshot
@@ -367,11 +520,13 @@ with tab_summary:
 
             strategy_summary = (
                 master_df
-                .groupby("strategy")
+                .groupby("strategy", dropna=False)
                 .agg(
                     selections=("player", "count"),
                     avg_expected_points=("expected_points", "mean"),
-                    total_expected_points=("expected_points", "sum")
+                    total_expected_points=("expected_points", "sum"),
+                    avg_credits=("credits", "mean"),
+                    total_credits=("credits", "sum"),
                 )
                 .reset_index()
             )
@@ -380,6 +535,15 @@ with tab_summary:
                 "total_expected_points",
                 ascending=False
             )
+
+            for col in [
+                "avg_expected_points",
+                "total_expected_points",
+                "avg_credits",
+                "total_credits",
+            ]:
+                if col in strategy_summary.columns:
+                    strategy_summary[col] = strategy_summary[col].round(2)
 
             st.dataframe(
                 strategy_summary,
@@ -399,23 +563,19 @@ with tab_summary:
             )
 
             # ----------------------------------------------------
-            # Download
+            # Download Warehouse
             # ----------------------------------------------------
-            warehouse_csv = master_df.to_csv(
-                index=False,
-                sep=";",
-                decimal=","
-            ).encode("utf-8-sig")
-
             st.download_button(
                 "⬇️ Download prediction_warehouse.csv",
-                warehouse_csv,
+                dataframe_to_csv_bytes(master_df),
                 file_name="prediction_warehouse.csv",
                 mime="text/csv",
                 key="warehouse_download"
             )
+
+
 # ------------------------------------------------------------
-# TAB 2 — Actual Results
+# TAB 3 — Actual Results
 # ------------------------------------------------------------
 with tab_actual:
 
@@ -485,13 +645,17 @@ with tab_actual:
 
 
 # ------------------------------------------------------------
-# TAB 3 — Backtesting
+# TAB 4 — Backtesting
 # ------------------------------------------------------------
 with tab_backtest:
 
     st.subheader("Backtesting")
 
-    pred_ready = "prediction_log" in st.session_state
+    pred_ready = (
+        "prediction_log" in st.session_state
+        or "prediction_log_master" in st.session_state
+    )
+
     actual_ready = "actual_results" in st.session_state
 
     c1, c2 = st.columns(2)
@@ -510,11 +674,15 @@ with tab_backtest:
 
     if not pred_ready or not actual_ready:
         st.info(
-            "Upload both prediction_log.csv and TennisMyLife CSV to enable backtesting."
+            "Upload prediction logs and TennisMyLife CSV to enable backtesting."
         )
 
     else:
-        pred_df = st.session_state["prediction_log"]
+        if "prediction_log_master" in st.session_state:
+            pred_df = st.session_state["prediction_log_master"]
+        else:
+            pred_df = st.session_state["prediction_log"]
+
         actual_df = st.session_state["actual_results"]
 
         st.markdown("### Loaded Data Summary")
