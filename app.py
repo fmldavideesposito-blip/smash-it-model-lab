@@ -1639,11 +1639,10 @@ if not prediction_actual_df.empty:
         key="download_prediction_vs_actual_global"
     )
 
-        # ----------------------------------------------------
-        # Loaded Data Summary
-        # ----------------------------------------------------
-        st.markdown("### Loaded Data Summary")
-
+# ----------------------------------------------------
+# Loaded Data Summary
+# ----------------------------------------------------
+st.markdown("### Loaded Data Summary")
         s1, s2 = st.columns(2)
 
         with s1:
