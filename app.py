@@ -443,6 +443,21 @@ def build_prediction_vs_actual_global(
         ascending=False
     )
 
+    merged["expected_points"] = (
+        merged["expected_points"]
+        .round(1)
+    )
+
+    merged["prediction_error"] = (
+        merged["prediction_error"]
+        .round(1)
+    )
+
+    merged["efficiency_ratio"] = (
+        merged["efficiency_ratio"]
+        .round(2)
+    )
+
     return merged
 
 def filter_actuals_by_tournament(
@@ -1619,16 +1634,62 @@ with tab_backtest:
             build_prediction_vs_actual_global(
                 pred_df,
                 actual_df
-    )
-)
+            )
+        )
 
         if not prediction_actual_df.empty:
 
-            st.dataframe(
-                prediction_actual_df,
-                use_container_width=True,
-                hide_index=True
-            )
+            # -----------------------------------
+            # KPI Summary
+            # -----------------------------------
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                st.metric(
+                    "Players Compared",
+                    len(prediction_actual_df)
+                )
+
+            with c2:
+                st.metric(
+                    "Average Efficiency",
+                    round(
+                        prediction_actual_df[
+                            "efficiency_ratio"
+                        ].mean(),
+                        2
+                    )
+                )
+
+            with c3:
+                st.metric(
+                    "Total Prediction Error",
+                    round(
+                        prediction_actual_df[
+                            "prediction_error"
+                        ].sum(),
+                        1
+                    )
+                )
+
+    # -----------------------------------
+    # Detail Table
+    # -----------------------------------
+    st.dataframe(
+        prediction_actual_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.download_button(
+        "⬇️ Download prediction_vs_actual_global.csv",
+        dataframe_to_csv_bytes(
+            prediction_actual_df
+        ),
+        file_name="prediction_vs_actual_global.csv",
+        mime="text/csv",
+        key="download_prediction_vs_actual_global"
+    )
 
             st.download_button(
                 "⬇️ Download prediction_vs_actual_global.csv",
