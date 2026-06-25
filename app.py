@@ -358,6 +358,93 @@ def build_actual_player_wins(actual_df: pd.DataFrame):
 
     return player_wins
 
+# ------------------------------------------------------------
+# Prediction vs Actual Global
+# ------------------------------------------------------------
+def build_prediction_vs_actual_global(
+    pred_df: pd.DataFrame,
+    actual_df: pd.DataFrame
+):
+
+    if "player" not in pred_df.columns:
+        return pd.DataFrame()
+
+    if "expected_points" not in pred_df.columns:
+        return pd.DataFrame()
+
+    actual_wins = build_actual_player_wins(actual_df)
+
+    if actual_wins.empty:
+        return pd.DataFrame()
+
+    prediction_summary = (
+        pred_df
+        .groupby(
+            ["player"],
+            dropna=False
+        )
+        .agg(
+            expected_points=("expected_points", "sum"),
+            selections=("player", "count")
+        )
+        .reset_index()
+    )
+
+    prediction_summary["player_norm"] = (
+        prediction_summary["player"]
+        .astype(str)
+        .str.lower()
+        .str.strip()
+    )
+
+    actual_wins = actual_wins.copy()
+
+    actual_wins["player_norm"] = (
+        actual_wins["player"]
+        .astype(str)
+        .str.lower()
+        .str.strip()
+    )
+
+    merged = pd.merge(
+        prediction_summary,
+        actual_wins[
+            [
+                "player_norm",
+                "wins",
+                "actual_points"
+            ]
+        ],
+        on="player_norm",
+        how="left"
+    )
+
+    merged["wins"] = merged["wins"].fillna(0)
+    merged["actual_points"] = merged["actual_points"].fillna(0)
+
+    merged["prediction_error"] = (
+        merged["actual_points"]
+        - merged["expected_points"]
+    )
+
+    merged["efficiency_ratio"] = (
+        merged["actual_points"]
+        / merged["expected_points"]
+    )
+
+    merged["efficiency_ratio"] = (
+        merged["efficiency_ratio"]
+        .replace([float("inf")], 0)
+        .fillna(0)
+    )
+
+    merged = merged.sort_values(
+        "prediction_error",
+        ascending=False
+    )
+
+    return merged
+
 def filter_actuals_by_tournament(
     actual_df: pd.DataFrame,
     tournament_filter: str
@@ -1518,6 +1605,39 @@ with tab_backtest:
             st.info(
                 "Player matching is not available. Check prediction data and actual data columns."
             )
+
+        
+        # ----------------------------------------------------
+# Prediction vs Actual Global
+# ----------------------------------------------------
+st.markdown(
+    "### Prediction vs Actual Global"
+)
+
+prediction_actual_df = (
+    build_prediction_vs_actual_global(
+        pred_df,
+        actual_df
+    )
+)
+
+if not prediction_actual_df.empty:
+
+    st.dataframe(
+        prediction_actual_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.download_button(
+        "⬇️ Download prediction_vs_actual_global.csv",
+        dataframe_to_csv_bytes(
+            prediction_actual_df
+        ),
+        file_name="prediction_vs_actual_global.csv",
+        mime="text/csv",
+        key="download_prediction_vs_actual_global"
+    )
 
         # ----------------------------------------------------
         # Loaded Data Summary
