@@ -21,6 +21,7 @@ st.caption("Prediction Backtesting & Model Calibration")
 # Costanti TennisMyLife
 # ------------------------------------------------------------
 TML_DATA_FILES_API = "https://stats.tennismylife.org/api/data-files"
+POINTS_PER_WIN = 25
 
 
 # ------------------------------------------------------------
@@ -213,7 +214,7 @@ def find_tml_season_url(catalog_df: pd.DataFrame, year: int):
     """
     Trova nel catalogo TennisMyLife il file ATP annuale, es. 2026.csv.
 
-    Evita i file challenger quando possibile.
+    Evita i file Challenger quando possibile.
     """
     if catalog_df.empty:
         return None, None
@@ -231,7 +232,6 @@ def find_tml_season_url(catalog_df: pd.DataFrame, year: int):
         row = exact.iloc[0]
         return row["url"], row["name"]
 
-    # fallback più permissivo
     contains = catalog_df[
         catalog_df["name"].astype(str).str.contains(str(year), case=False, na=False)
         & ~catalog_df["name"].astype(str).str.contains("challenger", case=False, na=False)
@@ -268,6 +268,110 @@ def get_years_from_prediction_data():
     )
 
     return sorted(years)
+
+
+# ------------------------------------------------------------
+# Utility Actual Results
+# ------------------------------------------------------------
+def build_actual_tournament_summary(actual_df: pd.DataFrame):
+    """
+    Costruisce un riepilogo per torneo dai dati TennisMyLife.
+    """
+    if "tourney_name" not in actual_df.columns:
+        return pd.DataFrame()
+
+    agg_dict = {}
+
+    if "match_num" in actual_df.columns:
+        agg_dict["matches"] = ("match_num", "count")
+    else:
+        agg_dict["matches"] = ("tourney_name", "count")
+
+    if "winner_name" in actual_df.columns:
+        agg_dict["unique_winners"] = ("winner_name", "nunique")
+
+    if "loser_name" in actual_df.columns:
+        agg_dict["unique_losers"] = ("loser_name", "nunique")
+
+    if "surface" in actual_df.columns:
+        agg_dict["surface"] = ("surface", "first")
+
+    if "draw_size" in actual_df.columns:
+        agg_dict["draw_size"] = ("draw_size", "first")
+
+    if "tourney_level" in actual_df.columns:
+        agg_dict["tourney_level"] = ("tourney_level", "first")
+
+    if "tourney_date" in actual_df.columns:
+        agg_dict["first_date"] = ("tourney_date", "min")
+        agg_dict["last_date"] = ("tourney_date", "max")
+
+    summary = (
+        actual_df
+        .groupby("tourney_name", dropna=False)
+        .agg(**agg_dict)
+        .reset_index()
+        .sort_values("matches", ascending=False)
+    )
+
+    return summary
+
+
+def build_actual_player_wins(actual_df: pd.DataFrame):
+    """
+    Calcola wins e actual points per player.
+    """
+    if "winner_name" not in actual_df.columns:
+        return pd.DataFrame()
+
+    base = actual_df.copy()
+
+    group_cols = ["winner_name"]
+
+    agg_dict = {
+        "wins": ("winner_name", "count")
+    }
+
+    if "tourney_name" in base.columns:
+        agg_dict["tournaments_won_matches"] = ("tourney_name", "nunique")
+
+    if "surface" in base.columns:
+        agg_dict["surfaces"] = ("surface", lambda x: ", ".join(sorted(set(x.dropna().astype(str)))))
+
+    if "round" in base.columns:
+        agg_dict["rounds_won"] = ("round", lambda x: ", ".join(sorted(set(x.dropna().astype(str)))))
+
+    player_wins = (
+        base
+        .groupby(group_cols, dropna=False)
+        .agg(**agg_dict)
+        .reset_index()
+        .rename(columns={"winner_name": "player"})
+    )
+
+    player_wins["actual_points"] = player_wins["wins"] * POINTS_PER_WIN
+
+    player_wins = player_wins.sort_values(
+        ["actual_points", "wins"],
+        ascending=[False, False]
+    )
+
+    return player_wins
+
+
+def filter_actuals_by_tournament(actual_df: pd.DataFrame, tournament_filter: str):
+    """
+    Filtra actual_df per torneo se richiesto.
+    """
+    if tournament_filter == "All Tournaments":
+        return actual_df.copy()
+
+    if "tourney_name" not in actual_df.columns:
+        return actual_df.copy()
+
+    return actual_df[
+        actual_df["tourney_name"].astype(str) == tournament_filter
+    ].copy()
 
 
 # ------------------------------------------------------------
@@ -721,13 +825,11 @@ with tab_actual:
             st.success(
                 f"Anni rilevati dal Prediction Warehouse: {warehouse_years}"
             )
-
             default_years = warehouse_years
         else:
             st.info(
                 "Nessun anno rilevato dal Prediction Warehouse. Seleziona manualmente la stagione."
             )
-
             default_years = [2026]
 
         selectable_years = list(range(2026, 2019, -1))
@@ -891,6 +993,9 @@ with tab_actual:
                 hide_index=True
             )
 
+    # --------------------------------------------------------
+    # Actual Results Analysis
+    # --------------------------------------------------------
     if "actual_results" in st.session_state:
 
         actual_df = st.session_state["actual_results"]
@@ -927,6 +1032,126 @@ with tab_actual:
                 "Some expected TennisMyLife columns were not found:"
             )
             st.write(missing_tml_cols)
+
+        # ----------------------------------------------------
+        # Filters
+        # ----------------------------------------------------
+        st.markdown("### Actual Results Filters")
+
+        if "tourney_name" in actual_df.columns:
+            tournament_options = (
+                ["All Tournaments"]
+                + sorted(
+                    actual_df["tourney_name"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+            )
+        else:
+            tournament_options = ["All Tournaments"]
+
+        selected_actual_tournament = st.selectbox(
+            "Filter by tournament",
+            tournament_options,
+            key="actual_tournament_filter"
+        )
+
+        filtered_actual_df = filter_actuals_by_tournament(
+            actual_df,
+            selected_actual_tournament
+        )
+
+        player_search = st.text_input(
+            "Search player in actual winners",
+            value="",
+            key="actual_player_search"
+        )
+
+        # ----------------------------------------------------
+        # Tournament Summary
+        # ----------------------------------------------------
+        tournament_summary = build_actual_tournament_summary(
+            filtered_actual_df
+        )
+
+        if not tournament_summary.empty:
+            st.markdown("### Actual Tournament Summary")
+
+            st.dataframe(
+                tournament_summary,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download actual_tournament_summary.csv",
+                dataframe_to_csv_bytes(tournament_summary),
+                file_name="actual_tournament_summary.csv",
+                mime="text/csv",
+                key="download_actual_tournament_summary"
+            )
+
+        # ----------------------------------------------------
+        # Actual Player Wins
+        # ----------------------------------------------------
+        player_wins = build_actual_player_wins(
+            filtered_actual_df
+        )
+
+        if not player_wins.empty:
+
+            if player_search.strip():
+                player_wins = player_wins[
+                    player_wins["player"]
+                    .astype(str)
+                    .str.contains(
+                        player_search.strip(),
+                        case=False,
+                        na=False
+                    )
+                ].copy()
+
+            st.markdown("### Actual Player Wins")
+
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                st.metric(
+                    "Players with wins",
+                    player_wins["player"].nunique()
+                )
+
+            with c2:
+                total_wins = int(player_wins["wins"].sum()) if "wins" in player_wins.columns else 0
+
+                st.metric(
+                    "Total wins",
+                    total_wins
+                )
+
+            with c3:
+                total_actual_points = int(player_wins["actual_points"].sum()) if "actual_points" in player_wins.columns else 0
+
+                st.metric(
+                    "Total actual points",
+                    total_actual_points
+                )
+
+            st.dataframe(
+                player_wins,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download actual_player_wins.csv",
+                dataframe_to_csv_bytes(player_wins),
+                file_name="actual_player_wins.csv",
+                mime="text/csv",
+                key="download_actual_player_wins"
+            )
 
 
 # ------------------------------------------------------------
