@@ -1474,12 +1474,13 @@ with tab_backtest:
         )
 
     else:
+
         if "prediction_log_master" in st.session_state:
             pred_df = st.session_state["prediction_log_master"]
         else:
             pred_df = st.session_state["prediction_log"]
 
-            actual_df = st.session_state["actual_results"]
+        actual_df = st.session_state["actual_results"]
 
         # ----------------------------------------------------
         # Tournament Mapping
@@ -1608,64 +1609,64 @@ with tab_backtest:
 
         
         # ----------------------------------------------------
-# Prediction vs Actual Global
-# ----------------------------------------------------
-st.markdown(
-    "### Prediction vs Actual Global"
-)
-
-prediction_actual_df = (
-    build_prediction_vs_actual_global(
-        pred_df,
-        actual_df
-    )
-)
-
-if not prediction_actual_df.empty:
-
-    st.dataframe(
-        prediction_actual_df,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.download_button(
-        "⬇️ Download prediction_vs_actual_global.csv",
-        dataframe_to_csv_bytes(
-            prediction_actual_df
-        ),
-        file_name="prediction_vs_actual_global.csv",
-        mime="text/csv",
-        key="download_prediction_vs_actual_global"
-    )
-
-# ----------------------------------------------------
-# Loaded Data Summary
-# ----------------------------------------------------
-st.markdown("### Loaded Data Summary")
-
-s1, s2 = st.columns(2)
-
-with s1:
-    st.metric(
-        "Prediction rows",
-        len(pred_df)
-            )
-
-with s2:
-    st.metric(
-            "Actual match rows",
-            len(actual_df)
-            )
-
-st.info(
-    "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
+        # Prediction vs Actual Global
+        # ----------------------------------------------------
+        st.markdown(
+            "### Prediction vs Actual Global"
         )
 
-st.markdown("### Next step preview")
+        prediction_actual_df = (
+            build_prediction_vs_actual_global(
+                pred_df,
+                actual_df
+    )
+)
 
-st.write("1. Filter TennisMyLife matches by tournament and year")
-st.write("2. Count wins for each predicted player")
-st.write("3. Calculate actual points using wins * 25")
-st.write("4. Compare expected points vs actual points")
-st.write("5. Calculate prediction error and efficiency ratio")
+        if not prediction_actual_df.empty:
+
+            st.dataframe(
+                prediction_actual_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download prediction_vs_actual_global.csv",
+                dataframe_to_csv_bytes(
+                    prediction_actual_df
+                ),
+                file_name="prediction_vs_actual_global.csv",
+                mime="text/csv",
+                key="download_prediction_vs_actual_global"
+            )
+
+        # ----------------------------------------------------
+        # Loaded Data Summary
+        # ----------------------------------------------------
+        st.markdown("### Loaded Data Summary")
+
+        s1, s2 = st.columns(2)
+
+        with s1:
+            st.metric(
+                "Prediction rows",
+                len(pred_df)
+                    )
+
+        with s2:
+            st.metric(
+                    "Actual match rows",
+                    len(actual_df)
+                    )
+
+        st.info(
+            "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
+                )
+
+        st.markdown("### Next step preview")
+
+        st.write("1. Filter TennisMyLife matches by tournament and year")
+        st.write("2. Count wins for each predicted player")
+        st.write("3. Calculate actual points using wins * 25")
+        st.write("4. Compare expected points vs actual points")
+        st.write("5. Calculate prediction error and efficiency ratio")
