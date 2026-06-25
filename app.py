@@ -408,6 +408,122 @@ def normalize_tournament_name(name):
 
 
 def build_tournament_mapping(pred_df, actual_df):
+
+# ------------------------------------------------------------
+# Player Matching between Predictions and Actuals
+# ------------------------------------------------------------
+def normalize_player_name(name):
+    """
+    Normalizza il nome player per confronti robusti.
+    """
+
+    if pd.isna(name):
+        return ""
+
+    name = str(name).lower().strip()
+
+    replacements = {
+        "-": " ",
+        ".": "",
+        "'": "",
+        "’": "",
+    }
+
+    for old, new in replacements.items():
+        name = name.replace(old, new)
+
+    name = " ".join(name.split())
+
+    return name
+
+
+def build_predicted_players_actual_match(pred_df: pd.DataFrame, actual_df: pd.DataFrame):
+    """
+    Cerca tutti i player del Prediction Warehouse dentro gli actual TennisMyLife.
+
+    Output:
+    - player previsto
+    - presenza negli actual
+    - wins
+    - actual_points
+    - actual tournaments
+    """
+
+    if "player" not in pred_df.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "winner_name" not in actual_df.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    pred_players = (
+        pred_df["player"]
+        .dropna()
+        .astype(str)
+        .drop_duplicates()
+        .sort_values()
+        .tolist()
+    )
+
+    actual_wins = build_actual_player_wins(actual_df)
+
+    if actual_wins.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    actual_wins = actual_wins.copy()
+
+    actual_wins["player_norm"] = actual_wins["player"].apply(
+        normalize_player_name
+    )
+
+    rows = []
+
+    for player in pred_players:
+
+        player_norm = normalize_player_name(player)
+
+        matched = actual_wins[
+            actual_wins["player_norm"] == player_norm
+        ].copy()
+
+        if not matched.empty:
+
+            row = matched.iloc[0].to_dict()
+
+            rows.append(
+                {
+                    "predicted_player": player,
+                    "matched_actual_player": row.get("player", ""),
+                    "found_in_actuals": True,
+                    "wins": row.get("wins", 0),
+                    "actual_points": row.get("actual_points", 0),
+                    "tournaments_won_matches": row.get("tournaments_won_matches", ""),
+                    "surfaces": row.get("surfaces", ""),
+                    "rounds_won": row.get("rounds_won", ""),
+                }
+            )
+
+        else:
+
+            rows.append(
+                {
+                    "predicted_player": player,
+                    "matched_actual_player": "",
+                    "found_in_actuals": False,
+                    "wins": 0,
+                    "actual_points": 0,
+                    "tournaments_won_matches": "",
+                    "surfaces": "",
+                    "rounds_won": "",
+                }
+            )
+
+    match_df = pd.DataFrame(rows)
+
+    unmatched_df = match_df[
+        match_df["found_in_actuals"] == False
+    ].copy()
+
+    return match_df, unmatched_df
     """
     Costruisce una tabella di mapping tra i nomi torneo del Prediction Warehouse
     e i nomi torneo presenti nel database TennisMyLife.
@@ -579,7 +695,11 @@ def build_tournament_mapping(pred_df, actual_df):
             }
         )
 
+    return pd.DataFrame(mapping_rows)
     
+    Filtra actual_df per torneo se richiesto.
+    """
+    if tournament_filter == "All Tournaments":
         return actual_df.copy()
 
     if "tourney_name" not in actual_df.columns:
@@ -1444,6 +1564,96 @@ with tab_backtest:
         else:
             st.success(
                 "All prediction tournaments have at least one TennisMyLife match."
+            )
+
+        # ----------------------------------------------------
+        # Predicted Players vs Actual Winners
+        # ----------------------------------------------------
+        st.markdown("### Predicted Players vs Actual Winners")
+
+        player_match_df, unmatched_players_df = build_predicted_players_actual_match(
+            pred_df,
+            actual_df
+        )
+
+        if not player_match_df.empty:
+
+            total_predicted_players = player_match_df["predicted_player"].nunique()
+
+            matched_players = int(
+                player_match_df["found_in_actuals"].sum()
+            )
+
+            player_match_rate = (
+                matched_players / total_predicted_players * 100
+                if total_predicted_players > 0
+                else 0
+            )
+
+            p1, p2, p3 = st.columns(3)
+
+            with p1:
+                st.metric(
+                    "Predicted Players",
+                    total_predicted_players
+                )
+
+            with p2:
+                st.metric(
+                    "Found in Actuals",
+                    matched_players
+                )
+
+            with p3:
+                st.metric(
+                    "Player Match Rate",
+                    f"{player_match_rate:.1f}%"
+                )
+
+            st.dataframe(
+                player_match_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download predicted_players_actual_match.csv",
+                dataframe_to_csv_bytes(player_match_df),
+                file_name="predicted_players_actual_match.csv",
+                mime="text/csv",
+                key="download_predicted_players_actual_match"
+            )
+
+            if not unmatched_players_df.empty:
+
+                st.warning(
+                    "Some predicted players were not found in actual TennisMyLife winners."
+                )
+
+                st.dataframe(
+                    unmatched_players_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                st.download_button(
+                    "⬇️ Download unmatched_predicted_players.csv",
+                    dataframe_to_csv_bytes(unmatched_players_df),
+                    file_name="unmatched_predicted_players.csv",
+                    mime="text/csv",
+                    key="download_unmatched_predicted_players"
+                )
+
+            else:
+
+                st.success(
+                    "All predicted players were found in actual TennisMyLife winners."
+                )
+
+        else:
+
+            st.info(
+                "Player matching is not available. Check that prediction data has 'player' and actual data has 'winner_name'."
             )
 
         # ----------------------------------------------------
