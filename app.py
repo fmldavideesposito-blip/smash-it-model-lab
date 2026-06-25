@@ -1,3 +1,5 @@
+import io
+import requests
 import pandas as pd
 import streamlit as st
 
@@ -13,6 +15,12 @@ st.set_page_config(
 
 st.title("🎾 Smash IT Model Lab")
 st.caption("Prediction Backtesting & Model Calibration")
+
+
+# ------------------------------------------------------------
+# Costanti TennisMyLife
+# ------------------------------------------------------------
+TML_DATA_FILES_API = "https://stats.tennismylife.org/api/data-files"
 
 
 # ------------------------------------------------------------
@@ -83,6 +91,36 @@ def read_tennismylife_csv(uploaded_file):
         return pd.read_csv(uploaded_file)
 
 
+def read_tennismylife_bytes(content: bytes):
+    """
+    Legge un CSV TennisMyLife scaricato via URL.
+    """
+    buffer = io.BytesIO(content)
+
+    try:
+        df = pd.read_csv(
+            buffer,
+            sep=",",
+            decimal=".",
+            encoding="utf-8-sig"
+        )
+
+        if len(df.columns) == 1:
+            buffer.seek(0)
+            df = pd.read_csv(
+                buffer,
+                sep=";",
+                decimal=",",
+                encoding="utf-8-sig"
+            )
+
+        return df
+
+    except Exception:
+        buffer.seek(0)
+        return pd.read_csv(buffer)
+
+
 def show_dataframe_diagnostics(df: pd.DataFrame, title: str):
     """
     Mostra diagnostica semplice del dataframe caricato.
@@ -135,6 +173,101 @@ def ensure_numeric(df: pd.DataFrame, cols):
             )
 
     return out
+
+
+# ------------------------------------------------------------
+# Utility TennisMyLife Dynamic
+# ------------------------------------------------------------
+@st.cache_data(show_spinner=False)
+def fetch_tml_catalog():
+    """
+    Scarica il catalogo dinamico dei file TennisMyLife.
+    """
+    response = requests.get(
+        TML_DATA_FILES_API,
+        timeout=30
+    )
+    response.raise_for_status()
+
+    data = response.json()
+    files = data.get("files", [])
+
+    return pd.DataFrame(files)
+
+
+@st.cache_data(show_spinner=False)
+def download_tml_csv_from_url(url: str):
+    """
+    Scarica un CSV TennisMyLife da URL e lo converte in dataframe.
+    """
+    response = requests.get(
+        url,
+        timeout=60
+    )
+    response.raise_for_status()
+
+    return read_tennismylife_bytes(response.content)
+
+
+def find_tml_season_url(catalog_df: pd.DataFrame, year: int):
+    """
+    Trova nel catalogo TennisMyLife il file ATP annuale, es. 2026.csv.
+
+    Evita i file challenger quando possibile.
+    """
+    if catalog_df.empty:
+        return None, None
+
+    if "name" not in catalog_df.columns or "url" not in catalog_df.columns:
+        return None, None
+
+    target_name = f"{int(year)}.csv"
+
+    exact = catalog_df[
+        catalog_df["name"].astype(str).str.lower() == target_name.lower()
+    ].copy()
+
+    if not exact.empty:
+        row = exact.iloc[0]
+        return row["url"], row["name"]
+
+    # fallback più permissivo
+    contains = catalog_df[
+        catalog_df["name"].astype(str).str.contains(str(year), case=False, na=False)
+        & ~catalog_df["name"].astype(str).str.contains("challenger", case=False, na=False)
+        & catalog_df["name"].astype(str).str.endswith(".csv")
+    ].copy()
+
+    if not contains.empty:
+        row = contains.iloc[0]
+        return row["url"], row["name"]
+
+    return None, None
+
+
+def get_years_from_prediction_data():
+    """
+    Estrae gli anni disponibili dal Prediction Warehouse o dal singolo prediction_log.
+    """
+    if "prediction_log_master" in st.session_state:
+        df = st.session_state["prediction_log_master"]
+    elif "prediction_log" in st.session_state:
+        df = st.session_state["prediction_log"]
+    else:
+        return []
+
+    if "year" not in df.columns:
+        return []
+
+    years = (
+        pd.to_numeric(df["year"], errors="coerce")
+        .dropna()
+        .astype(int)
+        .unique()
+        .tolist()
+    )
+
+    return sorted(years)
 
 
 # ------------------------------------------------------------
@@ -230,9 +363,7 @@ with tab_pred:
             st.warning(
                 "Alcune colonne attese non sono presenti nel prediction_log.csv."
             )
-
             st.write(missing_cols)
-
         else:
             st.success(
                 "Prediction log format looks valid."
@@ -329,28 +460,16 @@ with tab_summary:
             c1, c2, c3, c4 = st.columns(4)
 
             with c1:
-                st.metric(
-                    "Prediction Runs",
-                    run_count
-                )
+                st.metric("Prediction Runs", run_count)
 
             with c2:
-                st.metric(
-                    "Tournaments",
-                    tournament_count
-                )
+                st.metric("Tournaments", tournament_count)
 
             with c3:
-                st.metric(
-                    "Strategies",
-                    strategy_count
-                )
+                st.metric("Strategies", strategy_count)
 
             with c4:
-                st.metric(
-                    "Rows",
-                    rows_count
-                )
+                st.metric("Rows", rows_count)
 
             # ----------------------------------------------------
             # Tournament Summary
@@ -451,7 +570,6 @@ with tab_summary:
                     ascending=[False, False]
                 )
 
-                # Formatting
                 for col in [
                     "avg_expected_points",
                     "total_expected_points",
@@ -581,34 +699,201 @@ with tab_actual:
 
     st.subheader("Actual Results")
 
-    actual_file = st.file_uploader(
-        "Upload TennisMyLife CSV",
-        type=["csv"],
-        key="actual"
+    source_mode = st.radio(
+        "Source",
+        [
+            "TennisMyLife Dynamic",
+            "Manual CSV Upload"
+        ],
+        horizontal=True,
+        key="actual_source_mode"
     )
 
-    if actual_file:
+    if source_mode == "TennisMyLife Dynamic":
 
-        actual_df = read_tennismylife_csv(actual_file)
-
-        st.session_state["actual_results"] = actual_df
-
-        st.success(
-            f"{len(actual_df)} match rows loaded."
+        st.caption(
+            "Scarica automaticamente i dati ATP annuali da TennisMyLife usando il catalogo dinamico."
         )
 
-        show_dataframe_diagnostics(
-            actual_df,
-            "TennisMyLife CSV Diagnostics"
+        warehouse_years = get_years_from_prediction_data()
+
+        if warehouse_years:
+            st.success(
+                f"Anni rilevati dal Prediction Warehouse: {warehouse_years}"
+            )
+
+            default_years = warehouse_years
+        else:
+            st.info(
+                "Nessun anno rilevato dal Prediction Warehouse. Seleziona manualmente la stagione."
+            )
+
+            default_years = [2026]
+
+        selectable_years = list(range(2026, 2019, -1))
+
+        selected_years = st.multiselect(
+            "Season years to load",
+            selectable_years,
+            default=[
+                y for y in default_years
+                if y in selectable_years
+            ],
+            key="tml_dynamic_years"
         )
 
-        st.markdown("### Preview")
-
-        st.dataframe(
-            actual_df.head(50),
-            use_container_width=True,
-            hide_index=True
+        show_catalog = st.checkbox(
+            "Show TennisMyLife catalog",
+            value=False,
+            key="show_tml_catalog"
         )
+
+        if st.button(
+            "Load Actual Results from TennisMyLife",
+            key="load_tml_dynamic"
+        ):
+
+            if not selected_years:
+                st.warning("Seleziona almeno un anno.")
+            else:
+                try:
+                    with st.spinner("Loading TennisMyLife catalog..."):
+                        catalog_df = fetch_tml_catalog()
+
+                    if show_catalog:
+                        st.markdown("### TennisMyLife Catalog")
+                        st.dataframe(
+                            catalog_df,
+                            use_container_width=True,
+                            hide_index=True
+                        )
+
+                    loaded_actuals = []
+                    load_report = []
+
+                    for y in selected_years:
+                        url, file_name = find_tml_season_url(
+                            catalog_df,
+                            y
+                        )
+
+                        if not url:
+                            load_report.append(
+                                {
+                                    "year": y,
+                                    "file": "",
+                                    "status": "not found",
+                                    "rows": 0,
+                                }
+                            )
+                            continue
+
+                        with st.spinner(f"Loading TennisMyLife {file_name}..."):
+                            year_df = download_tml_csv_from_url(url)
+
+                        year_df["source_year"] = y
+                        year_df["source_file"] = file_name
+                        year_df["source_url"] = url
+
+                        loaded_actuals.append(year_df)
+
+                        load_report.append(
+                            {
+                                "year": y,
+                                "file": file_name,
+                                "status": "loaded",
+                                "rows": len(year_df),
+                            }
+                        )
+
+                    if loaded_actuals:
+                        actual_df = pd.concat(
+                            loaded_actuals,
+                            ignore_index=True
+                        )
+
+                        st.session_state["actual_results"] = actual_df
+
+                        st.success(
+                            f"{len(actual_df)} actual match rows loaded from TennisMyLife."
+                        )
+
+                        st.markdown("### Load Report")
+
+                        st.dataframe(
+                            pd.DataFrame(load_report),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+
+                        show_dataframe_diagnostics(
+                            actual_df,
+                            "TennisMyLife Dynamic Data Diagnostics"
+                        )
+
+                        st.markdown("### Preview")
+
+                        st.dataframe(
+                            actual_df.head(50),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+
+                    else:
+                        st.error(
+                            "Nessun file TennisMyLife caricato."
+                        )
+
+                        st.dataframe(
+                            pd.DataFrame(load_report),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+
+                except Exception as e:
+                    st.error(
+                        "Errore durante il caricamento dinamico dei dati TennisMyLife."
+                    )
+                    st.exception(e)
+
+    else:
+
+        st.caption(
+            "Modalità fallback: carica manualmente un CSV TennisMyLife."
+        )
+
+        actual_file = st.file_uploader(
+            "Upload TennisMyLife CSV",
+            type=["csv"],
+            key="actual"
+        )
+
+        if actual_file:
+
+            actual_df = read_tennismylife_csv(actual_file)
+
+            st.session_state["actual_results"] = actual_df
+
+            st.success(
+                f"{len(actual_df)} match rows loaded."
+            )
+
+            show_dataframe_diagnostics(
+                actual_df,
+                "TennisMyLife CSV Diagnostics"
+            )
+
+            st.markdown("### Preview")
+
+            st.dataframe(
+                actual_df.head(50),
+                use_container_width=True,
+                hide_index=True
+            )
+
+    if "actual_results" in st.session_state:
+
+        actual_df = st.session_state["actual_results"]
 
         expected_tml_cols = [
             "tourney_name",
@@ -674,7 +959,7 @@ with tab_backtest:
 
     if not pred_ready or not actual_ready:
         st.info(
-            "Upload prediction logs and TennisMyLife CSV to enable backtesting."
+            "Upload prediction logs and load TennisMyLife actual results to enable backtesting."
         )
 
     else:
