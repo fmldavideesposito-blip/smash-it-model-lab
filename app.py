@@ -358,7 +358,6 @@ def build_actual_player_wins(actual_df: pd.DataFrame):
 
     return player_wins
 
-
 def filter_actuals_by_tournament(
     actual_df: pd.DataFrame,
     tournament_filter: str
@@ -384,7 +383,7 @@ def filter_actuals_by_tournament(
 # ------------------------------------------------------------
 def normalize_tournament_name(name):
     """
-    Normalizza il nome torneo per confronti più robusti.
+    Normalizza il nome torneo per confronti robusti.
     """
 
     if pd.isna(name):
@@ -408,122 +407,6 @@ def normalize_tournament_name(name):
 
 
 def build_tournament_mapping(pred_df, actual_df):
-
-# ------------------------------------------------------------
-# Player Matching between Predictions and Actuals
-# ------------------------------------------------------------
-def normalize_player_name(name):
-    """
-    Normalizza il nome player per confronti robusti.
-    """
-
-    if pd.isna(name):
-        return ""
-
-    name = str(name).lower().strip()
-
-    replacements = {
-        "-": " ",
-        ".": "",
-        "'": "",
-        "’": "",
-    }
-
-    for old, new in replacements.items():
-        name = name.replace(old, new)
-
-    name = " ".join(name.split())
-
-    return name
-
-
-def build_predicted_players_actual_match(pred_df: pd.DataFrame, actual_df: pd.DataFrame):
-    """
-    Cerca tutti i player del Prediction Warehouse dentro gli actual TennisMyLife.
-
-    Output:
-    - player previsto
-    - presenza negli actual
-    - wins
-    - actual_points
-    - actual tournaments
-    """
-
-    if "player" not in pred_df.columns:
-        return pd.DataFrame(), pd.DataFrame()
-
-    if "winner_name" not in actual_df.columns:
-        return pd.DataFrame(), pd.DataFrame()
-
-    pred_players = (
-        pred_df["player"]
-        .dropna()
-        .astype(str)
-        .drop_duplicates()
-        .sort_values()
-        .tolist()
-    )
-
-    actual_wins = build_actual_player_wins(actual_df)
-
-    if actual_wins.empty:
-        return pd.DataFrame(), pd.DataFrame()
-
-    actual_wins = actual_wins.copy()
-
-    actual_wins["player_norm"] = actual_wins["player"].apply(
-        normalize_player_name
-    )
-
-    rows = []
-
-    for player in pred_players:
-
-        player_norm = normalize_player_name(player)
-
-        matched = actual_wins[
-            actual_wins["player_norm"] == player_norm
-        ].copy()
-
-        if not matched.empty:
-
-            row = matched.iloc[0].to_dict()
-
-            rows.append(
-                {
-                    "predicted_player": player,
-                    "matched_actual_player": row.get("player", ""),
-                    "found_in_actuals": True,
-                    "wins": row.get("wins", 0),
-                    "actual_points": row.get("actual_points", 0),
-                    "tournaments_won_matches": row.get("tournaments_won_matches", ""),
-                    "surfaces": row.get("surfaces", ""),
-                    "rounds_won": row.get("rounds_won", ""),
-                }
-            )
-
-        else:
-
-            rows.append(
-                {
-                    "predicted_player": player,
-                    "matched_actual_player": "",
-                    "found_in_actuals": False,
-                    "wins": 0,
-                    "actual_points": 0,
-                    "tournaments_won_matches": "",
-                    "surfaces": "",
-                    "rounds_won": "",
-                }
-            )
-
-    match_df = pd.DataFrame(rows)
-
-    unmatched_df = match_df[
-        match_df["found_in_actuals"] == False
-    ].copy()
-
-    return match_df, unmatched_df
     """
     Costruisce una tabella di mapping tra i nomi torneo del Prediction Warehouse
     e i nomi torneo presenti nel database TennisMyLife.
@@ -574,10 +457,14 @@ def build_predicted_players_actual_match(pred_df: pd.DataFrame, actual_df: pd.Da
 
     return pd.DataFrame(mapping_rows)
 
+
 # ------------------------------------------------------------
-# Tournament Mapping
+# Player Matching between Predictions and Actuals
 # ------------------------------------------------------------
-def normalize_tournament_name(name):
+def normalize_player_name(name):
+    """
+    Normalizza il nome player per confronti robusti.
+    """
 
     if pd.isna(name):
         return ""
@@ -585,130 +472,106 @@ def normalize_tournament_name(name):
     name = str(name).lower().strip()
 
     replacements = {
-        "roland garros": "rolandgarros",
-        "french open": "rolandgarros",
-        "rome": "roma",
-        "rome masters": "roma",
-        "internazionali bnl d'italia": "roma",
-        "madrid masters": "madrid",
+        "-": " ",
+        ".": "",
+        "'": "",
+        "’": "",
     }
 
-    return replacements.get(
-        name,
-        name.replace(" ", "")
+    for old, new in replacements.items():
+        name = name.replace(old, new)
+
+    name = " ".join(name.split())
+
+    return name
+
+
+def build_predicted_players_actual_match(
+    pred_df: pd.DataFrame,
+    actual_df: pd.DataFrame
+):
+    """
+    Cerca tutti i player del Prediction Warehouse negli actual TennisMyLife.
+    """
+
+    if "player" not in pred_df.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "winner_name" not in actual_df.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    pred_players = (
+        pred_df["player"]
+        .dropna()
+        .astype(str)
+        .drop_duplicates()
+        .sort_values()
+        .tolist()
     )
 
+    actual_wins = build_actual_player_wins(actual_df)
 
-def build_tournament_mapping(pred_df, actual_df):
+    if actual_wins.empty:
+        return pd.DataFrame(), pd.DataFrame()
 
-    pred_tournaments = []
+    actual_wins = actual_wins.copy()
 
-    if "tournament" in pred_df.columns:
-        pred_tournaments = sorted(
-            pred_df["tournament"]
-            .dropna()
-            .astype(str)
-            .unique()
-        )
+    actual_wins["player_norm"] = actual_wins["player"].apply(
+        normalize_player_name
+    )
 
-    actual_tournaments = []
+    rows = []
 
-    if "tourney_name" in actual_df.columns:
-        actual_tournaments = sorted(
-            actual_df["tourney_name"]
-            .dropna()
-            .astype(str)
-            .unique()
-        )
+    for player in pred_players:
 
-    mapping_rows = []
+        player_norm = normalize_player_name(player)
 
-    for pred_name in pred_tournaments:
+        matched = actual_wins[
+            actual_wins["player_norm"] == player_norm
+        ].copy()
 
-        pred_norm = normalize_tournament_name(
-            pred_name
-        )
+        if not matched.empty:
 
-        matches = []
+            row = matched.iloc[0].to_dict()
 
-        for actual_name in actual_tournaments:
-
-            actual_norm = normalize_tournament_name(
-                actual_name
+            rows.append(
+                {
+                    "predicted_player": player,
+                    "matched_actual_player": row.get("player", ""),
+                    "found_in_actuals": True,
+                    "wins": row.get("wins", 0),
+                    "actual_points": row.get("actual_points", 0),
+                    "tournaments_won_matches": row.get(
+                        "tournaments_won_matches",
+                        ""
+                    ),
+                    "surfaces": row.get("surfaces", ""),
+                    "rounds_won": row.get("rounds_won", ""),
+                }
             )
 
-            if pred_norm == actual_norm:
-                matches.append(actual_name)
+        else:
 
-        mapping_rows.append(
-            {
-                "prediction_tournament": pred_name,
-                "matched_actual_tournaments": ", ".join(matches)
-            }
-        )
-
-    return pd.DataFrame(mapping_rows)
-
-def build_tournament_mapping(pred_df, actual_df):
-
-    pred_tournaments = []
-
-    if "tournament" in pred_df.columns:
-        pred_tournaments = sorted(
-            pred_df["tournament"]
-            .dropna()
-            .astype(str)
-            .unique()
-        )
-
-    actual_tournaments = []
-
-    if "tourney_name" in actual_df.columns:
-        actual_tournaments = sorted(
-            actual_df["tourney_name"]
-            .dropna()
-            .astype(str)
-            .unique()
-        )
-
-    mapping_rows = []
-
-    for pred_name in pred_tournaments:
-
-        pred_norm = normalize_tournament_name(pred_name)
-
-        matches = []
-
-        for actual_name in actual_tournaments:
-
-            actual_norm = normalize_tournament_name(
-                actual_name
+            rows.append(
+                {
+                    "predicted_player": player,
+                    "matched_actual_player": "",
+                    "found_in_actuals": False,
+                    "wins": 0,
+                    "actual_points": 0,
+                    "tournaments_won_matches": "",
+                    "surfaces": "",
+                    "rounds_won": "",
+                }
             )
 
-            if pred_norm == actual_norm:
-                matches.append(actual_name)
+    match_df = pd.DataFrame(rows)
 
-        mapping_rows.append(
-            {
-                "prediction_tournament": pred_name,
-                "matched_actual_tournaments": ", ".join(matches)
-            }
-        )
-
-    return pd.DataFrame(mapping_rows)
-    
-    Filtra actual_df per torneo se richiesto.
-    """
-    if tournament_filter == "All Tournaments":
-        return actual_df.copy()
-
-    if "tourney_name" not in actual_df.columns:
-        return actual_df.copy()
-
-    return actual_df[
-        actual_df["tourney_name"].astype(str) == tournament_filter
+    unmatched_df = match_df[
+        match_df["found_in_actuals"] == False
     ].copy()
 
+    return match_df, unmatched_df
 
 # ------------------------------------------------------------
 # Tabs principali
@@ -1547,24 +1410,25 @@ with tab_backtest:
             hide_index=True
         )
 
-        unmatched = mapping_df[
-            mapping_df["matched_count"] == 0
-        ].copy()
+        if "matched_count" in mapping_df.columns:
+            unmatched = mapping_df[
+                mapping_df["matched_count"] == 0
+            ].copy()
 
-        if not unmatched.empty:
-            st.warning(
-                "Some prediction tournaments were not matched with TennisMyLife tournament names."
-            )
+            if not unmatched.empty:
+                st.warning(
+                    "Some prediction tournaments were not matched with TennisMyLife tournament names."
+                )
 
-            st.dataframe(
-                unmatched,
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.success(
-                "All prediction tournaments have at least one TennisMyLife match."
-            )
+                st.dataframe(
+                    unmatched,
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.success(
+                    "All prediction tournaments have at least one TennisMyLife match."
+                )
 
         # ----------------------------------------------------
         # Predicted Players vs Actual Winners
@@ -1578,7 +1442,9 @@ with tab_backtest:
 
         if not player_match_df.empty:
 
-            total_predicted_players = player_match_df["predicted_player"].nunique()
+            total_predicted_players = player_match_df[
+                "predicted_player"
+            ].nunique()
 
             matched_players = int(
                 player_match_df["found_in_actuals"].sum()
@@ -1625,7 +1491,6 @@ with tab_backtest:
             )
 
             if not unmatched_players_df.empty:
-
                 st.warning(
                     "Some predicted players were not found in actual TennisMyLife winners."
                 )
@@ -1645,15 +1510,13 @@ with tab_backtest:
                 )
 
             else:
-
                 st.success(
                     "All predicted players were found in actual TennisMyLife winners."
                 )
 
         else:
-
             st.info(
-                "Player matching is not available. Check that prediction data has 'player' and actual data has 'winner_name'."
+                "Player matching is not available. Check prediction data and actual data columns."
             )
 
         # ----------------------------------------------------
@@ -1679,14 +1542,10 @@ with tab_backtest:
             "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
         )
 
-        st.markdown(
-            """
-### Next step preview
+        st.markdown("### Next step preview")
 
-1. Filter TennisMyLife matches by tournament and year  
-2. Count wins for each predicted player  
-3. Calculate actual points using wins * 25  
-4. Compare expected points vs actual points  
-5. Calculate prediction error and efficiency ratio  
-            """
-        )
+        st.write("1. Filter TennisMyLife matches by tournament and year")
+        st.write("2. Count wins for each predicted player")
+        st.write("3. Calculate actual points using wins * 25")
+        st.write("4. Compare expected points vs actual points")
+        st.write("5. Calculate prediction error and efficiency ratio")
