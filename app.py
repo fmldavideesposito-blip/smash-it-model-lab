@@ -233,10 +233,10 @@ def find_tml_season_url(catalog_df: pd.DataFrame, year: int):
         return row["url"], row["name"]
 
     contains = catalog_df[
-        catalog_df["name"].astype(str).str.contains(str(year), case=False, na=False)
-        & ~catalog_df["name"].astype(str).str.contains("challenger", case=False, na=False)
-        & catalog_df["name"].astype(str).str.endswith(".csv")
-    ].copy()
+    catalog_df["name"].astype(str).str.contains(str(year), case=False, na=False)
+    & ~catalog_df["name"].astype(str).str.contains("challenger", case=False, na=False)
+    & catalog_df["name"].astype(str).str.endswith(".csv")
+].copy()
 
     if not contains.empty:
         row = contains.iloc[0]
@@ -378,6 +378,85 @@ def filter_actuals_by_tournament(
         == tournament_filter
     ].copy()
 
+
+# ------------------------------------------------------------
+# Tournament Mapping
+# ------------------------------------------------------------
+def normalize_tournament_name(name):
+    """
+    Normalizza il nome torneo per confronti più robusti.
+    """
+
+    if pd.isna(name):
+        return ""
+
+    name = str(name).lower().strip()
+
+    replacements = {
+        "roland garros": "rolandgarros",
+        "french open": "rolandgarros",
+        "rome": "roma",
+        "rome masters": "roma",
+        "internazionali bnl d'italia": "roma",
+        "madrid masters": "madrid",
+    }
+
+    return replacements.get(
+        name,
+        name.replace(" ", "")
+    )
+
+
+def build_tournament_mapping(pred_df, actual_df):
+    """
+    Costruisce una tabella di mapping tra i nomi torneo del Prediction Warehouse
+    e i nomi torneo presenti nel database TennisMyLife.
+    """
+
+    pred_tournaments = []
+
+    if "tournament" in pred_df.columns:
+        pred_tournaments = sorted(
+            pred_df["tournament"]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+
+    actual_tournaments = []
+
+    if "tourney_name" in actual_df.columns:
+        actual_tournaments = sorted(
+            actual_df["tourney_name"]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+
+    mapping_rows = []
+
+    for pred_name in pred_tournaments:
+
+        pred_norm = normalize_tournament_name(pred_name)
+
+        matches = []
+
+        for actual_name in actual_tournaments:
+
+            actual_norm = normalize_tournament_name(actual_name)
+
+            if pred_norm == actual_norm:
+                matches.append(actual_name)
+
+        mapping_rows.append(
+            {
+                "prediction_tournament": pred_name,
+                "matched_actual_tournaments": ", ".join(matches),
+                "matched_count": len(matches),
+            }
+        )
+
+    return pd.DataFrame(mapping_rows)
 
 # ------------------------------------------------------------
 # Tournament Mapping
@@ -1334,53 +1413,74 @@ with tab_backtest:
         else:
             pred_df = st.session_state["prediction_log"]
 
-actual_df = st.session_state["actual_results"]
+        actual_df = st.session_state["actual_results"]
 
-# ----------------------------------------------------
-# Tournament Mapping
-# ----------------------------------------------------
-st.markdown("### Tournament Mapping")
+        # ----------------------------------------------------
+        # Tournament Mapping
+        # ----------------------------------------------------
+        st.markdown("### Tournament Mapping")
 
-mapping_df = build_tournament_mapping(
-    pred_df,
-    actual_df
-)
+        mapping_df = build_tournament_mapping(
+            pred_df,
+            actual_df
+        )
 
-st.dataframe(
-    mapping_df,
-    use_container_width=True,
-    hide_index=True
-)
+        st.dataframe(
+            mapping_df,
+            use_container_width=True,
+            hide_index=True
+        )
 
-# ----------------------------------------------------
-# Loaded Data Summary
-# ----------------------------------------------------
-st.markdown("### Loaded Data Summary")
+        unmatched = mapping_df[
+            mapping_df["matched_count"] == 0
+        ].copy()
 
-s1, s2 = st.columns(2)
+        if not unmatched.empty:
+            st.warning(
+                "Some prediction tournaments were not matched with TennisMyLife tournament names."
+            )
 
-with s1:
-    st.metric(
-        "Prediction rows",
-        len(pred_df)
-    )
+            st.dataframe(
+                unmatched,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.success(
+                "All prediction tournaments have at least one TennisMyLife match."
+            )
 
-with s2:
-    st.metric(
-        "Actual match rows",
-        len(actual_df)
-    )
+        # ----------------------------------------------------
+        # Loaded Data Summary
+        # ----------------------------------------------------
+        st.markdown("### Loaded Data Summary")
 
-st.info(
-    "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
-)
+        s1, s2 = st.columns(2)
 
-st.markdown("""
+        with s1:
+            st.metric(
+                "Prediction rows",
+                len(pred_df)
+            )
+
+        with s2:
+            st.metric(
+                "Actual match rows",
+                len(actual_df)
+            )
+
+        st.info(
+            "Prediction vs Actual comparison will be implemented in Model Lab V1.1."
+        )
+
+        st.markdown(
+            """
 ### Next step preview
 
-1. Filter TennisMyLife matches by tournament and year
-2. Count wins for each predicted player
-3. Calculate actual points using wins * 25
-4. Compare expected points vs actual points
-5. Calculate prediction error and efficiency ratio
-""")
+1. Filter TennisMyLife matches by tournament and year  
+2. Count wins for each predicted player  
+3. Calculate actual points using wins * 25  
+4. Compare expected points vs actual points  
+5. Calculate prediction error and efficiency ratio  
+            """
+        )
