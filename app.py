@@ -30,12 +30,25 @@ with tab_pred:
 
     if prediction_file:
 
-        pred_df = pd.read_csv(prediction_file)
+        pred_df = pd.read_csv(
+    prediction_file,
+    sep=";",
+    decimal=",",
+    encoding="utf-8-sig"
+)
 
         st.success(
             f"{len(pred_df)} prediction rows loaded."
         )
 
+        st.write("Columns found:")
+
+st.dataframe(
+    pd.DataFrame(
+        {"Columns": pred_df.columns}
+    ),
+    use_container_width=True
+)
         st.dataframe(
             pred_df,
             use_container_width=True
