@@ -117,9 +117,10 @@ def show_dataframe_diagnostics(df: pd.DataFrame, title: str):
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
-tab_pred, tab_actual, tab_backtest = st.tabs(
+tab_pred, tab_summary, tab_actual, tab_backtest = st.tabs(
     [
         "Predictions",
+        "Prediction Warehouse",
         "Actual Results",
         "Backtesting"
     ]
@@ -195,7 +196,224 @@ with tab_pred:
                 "Prediction log format looks valid."
             )
 
+# ------------------------------------------------------------
+# TAB 2 — Prediction Warehouse
+# ------------------------------------------------------------
+with tab_summary:
 
+    st.subheader("Prediction Warehouse")
+
+    st.caption(
+        "Carica più prediction log scaricati dallo Smash IT Optimizer per creare uno storico centralizzato."
+    )
+
+    uploaded_logs = st.file_uploader(
+        "Upload one or more prediction logs",
+        type=["csv"],
+        accept_multiple_files=True,
+        key="prediction_warehouse"
+    )
+
+    if uploaded_logs:
+
+        all_logs = []
+
+        for f in uploaded_logs:
+
+            try:
+
+                df = read_prediction_log(f)
+
+                df["source_file"] = f.name
+
+                all_logs.append(df)
+
+            except Exception:
+
+                st.warning(
+                    f"Unable to load {f.name}"
+                )
+
+        if all_logs:
+
+            master_df = pd.concat(
+                all_logs,
+                ignore_index=True
+            )
+
+            st.session_state["prediction_log_master"] = master_df
+
+            # ----------------------------------------------------
+            # KPI
+            # ----------------------------------------------------
+            run_count = (
+                master_df["run_id"].nunique()
+                if "run_id" in master_df.columns
+                else 0
+            )
+
+            tournament_count = (
+                master_df["tournament"].nunique()
+                if "tournament" in master_df.columns
+                else 0
+            )
+
+            strategy_count = (
+                master_df["strategy"].nunique()
+                if "strategy" in master_df.columns
+                else 0
+            )
+
+            rows_count = len(master_df)
+
+            c1, c2, c3, c4 = st.columns(4)
+
+            with c1:
+                st.metric(
+                    "Prediction Runs",
+                    run_count
+                )
+
+            with c2:
+                st.metric(
+                    "Tournaments",
+                    tournament_count
+                )
+
+            with c3:
+                st.metric(
+                    "Strategies",
+                    strategy_count
+                )
+
+            with c4:
+                st.metric(
+                    "Rows",
+                    rows_count
+                )
+
+            # ----------------------------------------------------
+            # Tournament Summary
+            # ----------------------------------------------------
+            st.markdown("### Tournament Summary")
+
+            summary_df = (
+                master_df
+                .groupby(
+                    [
+                        "run_id",
+                        "tournament",
+                        "year",
+                        "surface",
+                        "strategy",
+                        "model_version"
+                    ],
+                    dropna=False
+                )
+                .agg(
+                    players=("player", "count"),
+                    total_expected_points=("expected_points", "sum"),
+                    total_credits=("credits", "sum")
+                )
+                .reset_index()
+            )
+
+            summary_df = summary_df.sort_values(
+                [
+                    "year",
+                    "tournament",
+                    "strategy"
+                ],
+                ascending=[False, True, True]
+            )
+
+            st.dataframe(
+                summary_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # ----------------------------------------------------
+            # Most Selected Players
+            # ----------------------------------------------------
+            st.markdown("### Most Selected Players")
+
+            player_summary = (
+                master_df
+                .groupby("player")
+                .agg(
+                    selections=("player", "count"),
+                    avg_expected_points=("expected_points", "mean"),
+                    avg_credits=("credits", "mean")
+                )
+                .reset_index()
+            )
+
+            player_summary = player_summary.sort_values(
+                "selections",
+                ascending=False
+            )
+
+            st.dataframe(
+                player_summary.head(25),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # ----------------------------------------------------
+            # Strategy Snapshot
+            # ----------------------------------------------------
+            st.markdown("### Strategy Snapshot")
+
+            strategy_summary = (
+                master_df
+                .groupby("strategy")
+                .agg(
+                    selections=("player", "count"),
+                    avg_expected_points=("expected_points", "mean"),
+                    total_expected_points=("expected_points", "sum")
+                )
+                .reset_index()
+            )
+
+            strategy_summary = strategy_summary.sort_values(
+                "total_expected_points",
+                ascending=False
+            )
+
+            st.dataframe(
+                strategy_summary,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # ----------------------------------------------------
+            # Full Warehouse
+            # ----------------------------------------------------
+            st.markdown("### Full Prediction Warehouse")
+
+            st.dataframe(
+                master_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # ----------------------------------------------------
+            # Download
+            # ----------------------------------------------------
+            warehouse_csv = master_df.to_csv(
+                index=False,
+                sep=";",
+                decimal=","
+            ).encode("utf-8-sig")
+
+            st.download_button(
+                "⬇️ Download prediction_warehouse.csv",
+                warehouse_csv,
+                file_name="prediction_warehouse.csv",
+                mime="text/csv",
+                key="warehouse_download"
+            )
 # ------------------------------------------------------------
 # TAB 2 — Actual Results
 # ------------------------------------------------------------
