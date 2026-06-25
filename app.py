@@ -1334,7 +1334,7 @@ with tab_backtest:
         else:
             pred_df = st.session_state["prediction_log"]
 
-        actual_df = st.session_state["actual_results"]
+actual_df = st.session_state["actual_results"]
 
 # ----------------------------------------------------
 # Tournament Mapping
@@ -1376,13 +1376,12 @@ st.markdown("### Loaded Data Summary")
 
         st.markdown("### Next step preview")
 
-        st.write(
-            """
-            The next release will:
-            1. filter TennisMyLife matches by tournament and year;
-            2. count wins for each predicted player;
-            3. calculate actual points using `wins × 25`;
-            4. compare expected points vs actual points;
-            5. calculate prediction error and efficiency ratio.
-            """
-        )
+        st.markdown("""
+### Next step preview
+
+1. Filter TennisMyLife matches by tournament and year
+2. Count wins for each predicted player
+3. Calculate actual points using wins * 25
+4. Compare expected points vs actual points
+5. Calculate prediction error and efficiency ratio
+""")
