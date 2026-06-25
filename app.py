@@ -579,11 +579,7 @@ def build_tournament_mapping(pred_df, actual_df):
             }
         )
 
-    return pd.DataFrame(mapping_rows)
     
-    Filtra actual_df per torneo se richiesto.
-    """
-    if tournament_filter == "All Tournaments":
         return actual_df.copy()
 
     if "tourney_name" not in actual_df.columns:
