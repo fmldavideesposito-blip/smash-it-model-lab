@@ -359,15 +359,30 @@ def build_actual_player_wins(actual_df: pd.DataFrame):
     return player_wins
 
 
-def filter_actuals_by_tournament(actual_df: pd.DataFrame, tournament_filter: str):
+def filter_actuals_by_tournament(
+    actual_df: pd.DataFrame,
+    tournament_filter: str
+):
     """
+    Filtra actual_df per torneo se richiesto.
+    """
+
+    if tournament_filter == "All Tournaments":
+        return actual_df.copy()
+
+    if "tourney_name" not in actual_df.columns:
+        return actual_df.copy()
+
+    return actual_df[
+        actual_df["tourney_name"].astype(str)
+        == tournament_filter
+    ].copy()
+
+
 # ------------------------------------------------------------
 # Tournament Mapping
 # ------------------------------------------------------------
 def normalize_tournament_name(name):
-    """
-    Normalizza il nome torneo per confronti robusti.
-    """
 
     if pd.isna(name):
         return ""
@@ -388,6 +403,56 @@ def normalize_tournament_name(name):
         name.replace(" ", "")
     )
 
+
+def build_tournament_mapping(pred_df, actual_df):
+
+    pred_tournaments = []
+
+    if "tournament" in pred_df.columns:
+        pred_tournaments = sorted(
+            pred_df["tournament"]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+
+    actual_tournaments = []
+
+    if "tourney_name" in actual_df.columns:
+        actual_tournaments = sorted(
+            actual_df["tourney_name"]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+
+    mapping_rows = []
+
+    for pred_name in pred_tournaments:
+
+        pred_norm = normalize_tournament_name(
+            pred_name
+        )
+
+        matches = []
+
+        for actual_name in actual_tournaments:
+
+            actual_norm = normalize_tournament_name(
+                actual_name
+            )
+
+            if pred_norm == actual_norm:
+                matches.append(actual_name)
+
+        mapping_rows.append(
+            {
+                "prediction_tournament": pred_name,
+                "matched_actual_tournaments": ", ".join(matches)
+            }
+        )
+
+    return pd.DataFrame(mapping_rows)
 
 def build_tournament_mapping(pred_df, actual_df):
 
@@ -1270,7 +1335,11 @@ with tab_backtest:
             pred_df = st.session_state["prediction_log"]
 
         actual_df = st.session_state["actual_results"]
-        st.markdown("### Tournament Mapping")
+
+# ----------------------------------------------------
+# Tournament Mapping
+# ----------------------------------------------------
+st.markdown("### Tournament Mapping")
 
 mapping_df = build_tournament_mapping(
     pred_df,
@@ -1282,8 +1351,11 @@ st.dataframe(
     use_container_width=True,
     hide_index=True
 )
-        st.markdown("### Loaded Data Summary")
 
+# ----------------------------------------------------
+# Loaded Data Summary
+# ----------------------------------------------------
+st.markdown("### Loaded Data Summary")
         s1, s2 = st.columns(2)
 
         with s1:
