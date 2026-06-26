@@ -452,6 +452,12 @@ def build_prediction_vs_actual_global(
         .round(2)
     )
 
+    merged["actual_minus_expected"] = (
+        merged["actual_points"]
+        -
+        merged["expected_points"]
+    )
+
     return merged
 
 def filter_actuals_by_tournament(
