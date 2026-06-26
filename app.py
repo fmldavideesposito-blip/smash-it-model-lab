@@ -1188,15 +1188,22 @@ with tab_pred:
 # ------------------------------------------------------------
 # TAB 2 — Prediction Warehouse
 # ------------------------------------------------------------
+
 with tab_summary:
 
     st.subheader("Prediction Warehouse")
 
-    repository_df = (
-    load_prediction_repository()
-)
+    repository_df = load_prediction_repository()
 
-if not repository_df.empty:
+    if not repository_df.empty:
+
+        st.success(
+            f"Repository loaded ({len(repository_df)} rows)"
+        )
+
+        st.session_state[
+            "prediction_log_master"
+        ] = repository_df
 
     st.success(
         f"Repository loaded ({len(repository_df)} rows)"
@@ -1256,61 +1263,61 @@ if not repository_df.empty:
 
         if all_logs:
 
-            master_df = pd.concat(
-                all_logs,
-                ignore_index=True
-            )
-
-            st.markdown(
-                "### Repository Management"
-            )
-
-            if st.button(
-    "Add Loaded Logs to Repository",
-    key="append_prediction_repository"
-):
-
-                current_repository = (
-        load_prediction_repository()
-    )
-
-    combined_repository = pd.concat(
-        [
-            current_repository,
-            master_df
-        ],
+    master_df = pd.concat(
+        all_logs,
         ignore_index=True
     )
 
-    dedupe_cols = []
+    st.session_state["prediction_log_master"] = master_df
 
-    for col in [
-        "run_id",
-        "player",
-        "tournament",
-        "strategy"
-    ]:
-        if col in combined_repository.columns:
-            dedupe_cols.append(col)
+    # ----------------------------------------------------
+    # Repository Management
+    # ----------------------------------------------------
+    st.markdown("### Repository Management")
 
-    if dedupe_cols:
+    if st.button(
+        "Add Loaded Logs To Repository",
+        key="append_prediction_repository"
+    ):
 
-        combined_repository = (
-            combined_repository
-            .drop_duplicates(
-                subset=dedupe_cols
-            )
+        current_repository = (
+            load_prediction_repository()
         )
 
-    save_prediction_repository(
-        combined_repository
-    )
+        combined_repository = pd.concat(
+            [
+                current_repository,
+                master_df
+            ],
+            ignore_index=True
+        )
 
-    st.success(
-        f"Repository updated ({len(combined_repository)} rows)"
-    )
+        dedupe_cols = [
+            c for c in [
+                "run_id",
+                "player",
+                "tournament",
+                "strategy"
+            ]
+            if c in combined_repository.columns
+        ]
 
-    st.session_state["prediction_log_master"] = master_df
+        if dedupe_cols:
+
+            combined_repository = (
+                combined_repository
+                .drop_duplicates(
+                    subset=dedupe_cols
+                )
+            )
+
+        save_prediction_repository(
+            combined_repository
+        )
+
+        st.success(
+            f"Repository updated ({len(combined_repository)} rows)"
+        )
 
             # ----------------------------------------------------
             # KPI
@@ -1512,7 +1519,6 @@ else:
             # ----------------------------------------------------
             # Strategy Snapshot
             # ----------------------------------------------------
-
 st.markdown("### Strategy Snapshot")
 
 strategy_summary = (
