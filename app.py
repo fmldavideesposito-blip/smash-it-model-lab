@@ -2,7 +2,6 @@ import io
 import requests
 import pandas as pd
 import streamlit as st
-from pathlib import Path
 
 
 # ------------------------------------------------------------
@@ -23,25 +22,6 @@ st.caption("Prediction Backtesting & Model Calibration")
 # ------------------------------------------------------------
 TML_DATA_FILES_API = "https://stats.tennismylife.org/api/data-files"
 POINTS_PER_WIN = 25
-
-# ------------------------------------------------------------
-# Persistent Repository
-# ------------------------------------------------------------
-REPOSITORY_FOLDER = "repository"
-
-WAREHOUSE_FILE = (
-    Path(REPOSITORY_FOLDER)
-    / "prediction_warehouse_master.csv"
-)
-
-ACTUAL_FILE = (
-    Path(REPOSITORY_FOLDER)
-    / "actual_results_master.csv"
-)
-
-Path(REPOSITORY_FOLDER).mkdir(
-    exist_ok=True
-)
 
 
 # ------------------------------------------------------------
@@ -179,62 +159,6 @@ def dataframe_to_csv_bytes(df: pd.DataFrame) -> bytes:
         encoding="utf-8-sig"
     ).encode("utf-8-sig")
 
-# ------------------------------------------------------------
-# Repository Utilities
-# ------------------------------------------------------------
-def load_repository_csv(path):
-
-    if not Path(path).exists():
-        return pd.DataFrame()
-
-    try:
-
-        return pd.read_csv(
-            path,
-            sep=";",
-            decimal=",",
-            encoding="utf-8-sig"
-        )
-
-    except Exception:
-
-        try:
-
-            return pd.read_csv(
-                path
-            )
-
-        except Exception:
-
-            return pd.DataFrame()
-
-
-def save_repository_csv(
-    df,
-    path
-):
-
-    df.to_csv(
-        path,
-        index=False,
-        sep=";",
-        decimal=",",
-        encoding="utf-8-sig"
-    )
-
-def load_prediction_repository():
-
-    return load_repository_csv(
-        WAREHOUSE_FILE
-    )
-
-
-def save_prediction_repository(df):
-
-    save_repository_csv(
-        df,
-        WAREHOUSE_FILE
-    )
 
 def ensure_numeric(df: pd.DataFrame, cols):
     """
@@ -889,24 +813,6 @@ def build_prediction_vs_actual_tournament(
         .reset_index()
     )
 
-    # --------------------------------------------------------
-    # Prediction Rank within Tournament + Strategy
-    # --------------------------------------------------------
-    prediction_summary["prediction_rank"] = (
-        prediction_summary
-        .groupby(
-            [
-                "tournament",
-                "strategy"
-            ]
-        )["expected_points"]
-        .rank(
-            method="dense",
-            ascending=False
-        )
-        .astype(int)
-    )
-
     rows = []
 
     for _, pred_row in prediction_summary.iterrows():
@@ -1006,12 +912,6 @@ def build_prediction_vs_actual_tournament(
                     else ""
                 ),
                 "actual_matches_in_tournament": len(actual_tournament_df),
-                "prediction_rank": int(
-                    pred_row.get(
-                        "prediction_rank",
-                         0
-                    )
-                ),
             }
         )
 
@@ -1071,7 +971,7 @@ def build_prediction_vs_actual_tournament(
             "strategy",
             "prediction_error"
         ],
-        ascending=[True, True, True]
+        ascending=[True, True, False]
     )
 
     summary_df = summary_df.sort_values(
@@ -1188,30 +1088,9 @@ with tab_pred:
 # ------------------------------------------------------------
 # TAB 2 — Prediction Warehouse
 # ------------------------------------------------------------
-
 with tab_summary:
 
     st.subheader("Prediction Warehouse")
-
-    repository_df = load_prediction_repository()
-
-    if not repository_df.empty:
-
-        st.success(
-            f"Repository loaded ({len(repository_df)} rows)"
-        )
-
-        st.session_state[
-            "prediction_log_master"
-        ] = repository_df
-
-    st.success(
-        f"Repository loaded ({len(repository_df)} rows)"
-    )
-
-    st.session_state[
-        "prediction_log_master"
-    ] = repository_df
 
     st.caption(
         "Carica più prediction log scaricati dallo Smash IT Optimizer per creare uno storico centralizzato."
@@ -1268,100 +1147,51 @@ with tab_summary:
                 ignore_index=True
             )
 
-    st.session_state["prediction_log_master"] = master_df
-
-    # ----------------------------------------------------
-    # Repository Management
-    # ----------------------------------------------------
-    st.markdown("### Repository Management")
-
-    if st.button(
-        "Add Loaded Logs To Repository",
-        key="append_prediction_repository"
-    ):
-
-        current_repository = (
-            load_prediction_repository()
-        )
-
-        combined_repository = pd.concat(
-            [
-                current_repository,
-                master_df
-            ],
-            ignore_index=True
-        )
-
-        dedupe_cols = [
-            c for c in [
-                "run_id",
-                "player",
-                "tournament",
-                "strategy"
-            ]
-            if c in combined_repository.columns
-        ]
-
-        if dedupe_cols:
-
-            combined_repository = (
-                combined_repository
-                .drop_duplicates(
-                    subset=dedupe_cols
-                )
-            )
-
-        save_prediction_repository(
-            combined_repository
-        )
-
-        st.success(
-            f"Repository updated ({len(combined_repository)} rows)"
-        )
+            st.session_state["prediction_log_master"] = master_df
 
             # ----------------------------------------------------
             # KPI
             # ----------------------------------------------------
-    run_count = (
+            run_count = (
                 master_df["run_id"].nunique()
                 if "run_id" in master_df.columns
                 else 0
             )
 
-    tournament_count = (
+            tournament_count = (
                 master_df["tournament"].nunique()
                 if "tournament" in master_df.columns
                 else 0
             )
 
-    strategy_count = (
+            strategy_count = (
                 master_df["strategy"].nunique()
                 if "strategy" in master_df.columns
                 else 0
             )
 
-    rows_count = len(master_df)
+            rows_count = len(master_df)
 
-    c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
+            with c1:
                 st.metric("Prediction Runs", run_count)
 
-    with c2:
+            with c2:
                 st.metric("Tournaments", tournament_count)
 
-    with c3:
+            with c3:
                 st.metric("Strategies", strategy_count)
 
-    with c4:
+            with c4:
                 st.metric("Rows", rows_count)
 
             # ----------------------------------------------------
             # Tournament Summary
             # ----------------------------------------------------
-st.markdown("### Tournament Summary")
+            st.markdown("### Tournament Summary")
 
-summary_df = (
+            summary_df = (
                 master_df
                 .groupby(
                     [
@@ -1382,7 +1212,7 @@ summary_df = (
                 .reset_index()
             )
 
-summary_df = summary_df.sort_values(
+            summary_df = summary_df.sort_values(
                 [
                     "year",
                     "tournament",
@@ -1391,7 +1221,7 @@ summary_df = summary_df.sort_values(
                 ascending=[False, True, True]
             )
 
-st.dataframe(
+            st.dataframe(
                 summary_df,
                 use_container_width=True,
                 hide_index=True
@@ -1400,29 +1230,29 @@ st.dataframe(
             # ----------------------------------------------------
             # Most Selected Players Overall
             # ----------------------------------------------------
-st.markdown("### Most Selected Players Overall")
+            st.markdown("### Most Selected Players Overall")
 
-strategy_options = (
+            strategy_options = (
                 ["All Strategies"]
                 + sorted(master_df["strategy"].dropna().unique().tolist())
                 if "strategy" in master_df.columns
                 else ["All Strategies"]
             )
 
-selected_strategy_filter = st.selectbox(
+            selected_strategy_filter = st.selectbox(
                 "Filter by strategy",
                 strategy_options,
                 key="most_selected_strategy_filter"
             )
 
-if selected_strategy_filter != "All Strategies":
+            if selected_strategy_filter != "All Strategies":
                 player_base_df = master_df[
                     master_df["strategy"] == selected_strategy_filter
                 ].copy()
-else:
+            else:
                 player_base_df = master_df.copy()
 
-if not player_base_df.empty:
+            if not player_base_df.empty:
 
                 player_summary = (
                     player_base_df
@@ -1513,15 +1343,15 @@ if not player_base_df.empty:
                     key="download_most_selected_players"
                 )
 
-else:
+            else:
                 st.info("No player data available for the selected strategy.")
 
             # ----------------------------------------------------
             # Strategy Snapshot
             # ----------------------------------------------------
-st.markdown("### Strategy Snapshot")
+            st.markdown("### Strategy Snapshot")
 
-strategy_summary = (
+            strategy_summary = (
                 master_df
                 .groupby("strategy", dropna=False)
                 .agg(
@@ -1534,12 +1364,12 @@ strategy_summary = (
                 .reset_index()
             )
 
-strategy_summary = strategy_summary.sort_values(
+            strategy_summary = strategy_summary.sort_values(
                 "total_expected_points",
                 ascending=False
             )
 
-for col in [
+            for col in [
                 "avg_expected_points",
                 "total_expected_points",
                 "avg_credits",
@@ -1548,44 +1378,18 @@ for col in [
                 if col in strategy_summary.columns:
                     strategy_summary[col] = strategy_summary[col].round(2)
 
-st.dataframe(
+            st.dataframe(
                 strategy_summary,
                 use_container_width=True,
                 hide_index=True
             )
 
-st.markdown(
-    "### Repository Preview"
-)
-
-repository_df = (
-    load_prediction_repository()
-)
-
-if not repository_df.empty:
-
-    st.dataframe(
-        repository_df.head(100),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.download_button(
-        "⬇️ Download Repository",
-        dataframe_to_csv_bytes(
-            repository_df
-        ),
-        file_name="prediction_warehouse_master.csv",
-        mime="text/csv",
-        key="download_repository"
-    )
-            
             # ----------------------------------------------------
             # Full Warehouse
             # ----------------------------------------------------
-st.markdown("### Full Prediction Warehouse")
+            st.markdown("### Full Prediction Warehouse")
 
-st.dataframe(
+            st.dataframe(
                 master_df,
                 use_container_width=True,
                 hide_index=True
@@ -1594,7 +1398,7 @@ st.dataframe(
             # ----------------------------------------------------
             # Download Warehouse
             # ----------------------------------------------------
-st.download_button(
+            st.download_button(
                 "⬇️ Download prediction_warehouse.csv",
                 dataframe_to_csv_bytes(master_df),
                 file_name="prediction_warehouse.csv",
