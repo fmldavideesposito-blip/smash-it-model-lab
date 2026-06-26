@@ -1263,10 +1263,10 @@ with tab_summary:
 
         if all_logs:
 
-    master_df = pd.concat(
-        all_logs,
-        ignore_index=True
-    )
+            master_df = pd.concat(
+                all_logs,
+                ignore_index=True
+            )
 
     st.session_state["prediction_log_master"] = master_df
 
