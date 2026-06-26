@@ -676,6 +676,316 @@ def build_predicted_players_actual_match(
     return match_df, unmatched_df
 
 # ------------------------------------------------------------
+# Prediction vs Actual by Tournament
+# ------------------------------------------------------------
+def build_prediction_vs_actual_tournament(
+    pred_df: pd.DataFrame,
+    actual_df: pd.DataFrame
+):
+    """
+    Confronta le previsioni con gli actual TennisMyLife a livello torneo.
+
+    Logica:
+    - prende ogni riga del prediction warehouse;
+    - usa tournament/year/player/strategy;
+    - mappa il nome torneo prediction con il nome torneo TennisMyLife;
+    - conta le vittorie reali solo in quel torneo;
+    - calcola actual_points = wins * POINTS_PER_WIN;
+    - calcola prediction_error = actual_points - expected_points;
+    - calcola efficiency_ratio = actual_points / expected_points.
+    """
+
+    required_pred_cols = [
+        "tournament",
+        "year",
+        "strategy",
+        "player",
+        "expected_points"
+    ]
+
+    for col in required_pred_cols:
+        if col not in pred_df.columns:
+            return pd.DataFrame(), pd.DataFrame()
+
+    if "tourney_name" not in actual_df.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    if "winner_name" not in actual_df.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    pred_base = pred_df.copy()
+    actual_base = actual_df.copy()
+
+    pred_base["expected_points"] = pd.to_numeric(
+        pred_base["expected_points"],
+        errors="coerce"
+    ).fillna(0)
+
+    pred_base["year"] = pd.to_numeric(
+        pred_base["year"],
+        errors="coerce"
+    ).fillna(0).astype(int)
+
+    # --------------------------------------------------------
+    # Normalizzazioni
+    # --------------------------------------------------------
+    pred_base["prediction_tournament_norm"] = (
+        pred_base["tournament"]
+        .apply(normalize_tournament_name)
+    )
+
+    pred_base["player_norm"] = (
+        pred_base["player"]
+        .apply(normalize_player_name)
+    )
+
+    actual_base["actual_tournament_norm"] = (
+        actual_base["tourney_name"]
+        .apply(normalize_tournament_name)
+    )
+
+    actual_base["winner_norm"] = (
+        actual_base["winner_name"]
+        .apply(normalize_player_name)
+    )
+
+    if "loser_name" in actual_base.columns:
+        actual_base["loser_norm"] = (
+            actual_base["loser_name"]
+            .apply(normalize_player_name)
+        )
+    else:
+        actual_base["loser_norm"] = ""
+
+    # --------------------------------------------------------
+    # Anno actual
+    # --------------------------------------------------------
+    if "source_year" in actual_base.columns:
+        actual_base["actual_year"] = pd.to_numeric(
+            actual_base["source_year"],
+            errors="coerce"
+        ).fillna(0).astype(int)
+
+    elif "tourney_date" in actual_base.columns:
+        actual_base["actual_year"] = (
+            actual_base["tourney_date"]
+            .astype(str)
+            .str.slice(0, 4)
+        )
+
+        actual_base["actual_year"] = pd.to_numeric(
+            actual_base["actual_year"],
+            errors="coerce"
+        ).fillna(0).astype(int)
+
+    else:
+        actual_base["actual_year"] = 0
+
+    # --------------------------------------------------------
+    # Aggregate prediction by tournament / strategy / player
+    # --------------------------------------------------------
+    group_cols = [
+        "run_id",
+        "tournament",
+        "year",
+        "surface",
+        "strategy",
+        "player",
+        "prediction_tournament_norm",
+        "player_norm"
+    ]
+
+    existing_group_cols = [
+        c for c in group_cols
+        if c in pred_base.columns
+    ]
+
+    prediction_summary = (
+        pred_base
+        .groupby(
+            existing_group_cols,
+            dropna=False
+        )
+        .agg(
+            expected_points=("expected_points", "sum"),
+            selections=("player", "count")
+        )
+        .reset_index()
+    )
+
+    rows = []
+
+    for _, pred_row in prediction_summary.iterrows():
+
+        pred_tournament = pred_row.get("tournament", "")
+        pred_tournament_norm = pred_row.get(
+            "prediction_tournament_norm",
+            ""
+        )
+
+        pred_year = int(pred_row.get("year", 0))
+        pred_player = pred_row.get("player", "")
+        pred_player_norm = pred_row.get("player_norm", "")
+        pred_strategy = pred_row.get("strategy", "")
+        expected_points = float(pred_row.get("expected_points", 0))
+
+        # ----------------------------------------------------
+        # Filtra actual per torneo + anno
+        # ----------------------------------------------------
+        actual_tournament_df = actual_base[
+            actual_base["actual_tournament_norm"]
+            == pred_tournament_norm
+        ].copy()
+
+        if pred_year > 0 and "actual_year" in actual_tournament_df.columns:
+            actual_tournament_df = actual_tournament_df[
+                actual_tournament_df["actual_year"] == pred_year
+            ].copy()
+
+        # ----------------------------------------------------
+        # Calcola wins nel torneo
+        # ----------------------------------------------------
+        wins = int(
+            (
+                actual_tournament_df["winner_norm"]
+                == pred_player_norm
+            ).sum()
+        )
+
+        if "loser_norm" in actual_tournament_df.columns:
+            losses = int(
+                (
+                    actual_tournament_df["loser_norm"]
+                    == pred_player_norm
+                ).sum()
+            )
+        else:
+            losses = 0
+
+        matches_played = wins + losses
+        actual_points = wins * POINTS_PER_WIN
+
+        prediction_error = actual_points - expected_points
+
+        efficiency_ratio = (
+            actual_points / expected_points
+            if expected_points > 0
+            else 0
+        )
+
+        rounds_won = ""
+
+        if wins > 0 and "round" in actual_tournament_df.columns:
+            rounds_won = ", ".join(
+                sorted(
+                    actual_tournament_df.loc[
+                        actual_tournament_df["winner_norm"]
+                        == pred_player_norm,
+                        "round"
+                    ]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+            )
+
+        rows.append(
+            {
+                "run_id": pred_row.get("run_id", ""),
+                "tournament": pred_tournament,
+                "year": pred_year,
+                "surface": pred_row.get("surface", ""),
+                "strategy": pred_strategy,
+                "player": pred_player,
+                "expected_points": round(expected_points, 2),
+                "actual_wins": wins,
+                "actual_losses": losses,
+                "actual_matches_played": matches_played,
+                "actual_points": round(actual_points, 2),
+                "prediction_error": round(prediction_error, 2),
+                "efficiency_ratio": round(efficiency_ratio, 3),
+                "rounds_won": rounds_won,
+                "matched_actual_tournament": (
+                    actual_tournament_df["tourney_name"].iloc[0]
+                    if not actual_tournament_df.empty
+                    else ""
+                ),
+                "actual_matches_in_tournament": len(actual_tournament_df),
+            }
+        )
+
+    detail_df = pd.DataFrame(rows)
+
+    if detail_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    # --------------------------------------------------------
+    # Team / Strategy summary
+    # --------------------------------------------------------
+    summary_df = (
+        detail_df
+        .groupby(
+            [
+                "run_id",
+                "tournament",
+                "year",
+                "surface",
+                "strategy"
+            ],
+            dropna=False
+        )
+        .agg(
+            players=("player", "count"),
+            expected_points=("expected_points", "sum"),
+            actual_points=("actual_points", "sum"),
+            actual_wins=("actual_wins", "sum"),
+            prediction_error=("prediction_error", "sum")
+        )
+        .reset_index()
+    )
+
+    summary_df["efficiency_ratio"] = (
+        summary_df["actual_points"]
+        / summary_df["expected_points"]
+    )
+
+    summary_df["efficiency_ratio"] = (
+        summary_df["efficiency_ratio"]
+        .replace([float("inf")], 0)
+        .fillna(0)
+    )
+
+    for col in [
+        "expected_points",
+        "actual_points",
+        "prediction_error",
+        "efficiency_ratio"
+    ]:
+        if col in summary_df.columns:
+            summary_df[col] = summary_df[col].round(3)
+
+    detail_df = detail_df.sort_values(
+        [
+            "tournament",
+            "strategy",
+            "prediction_error"
+        ],
+        ascending=[True, True, False]
+    )
+
+    summary_df = summary_df.sort_values(
+        [
+            "tournament",
+            "efficiency_ratio"
+        ],
+        ascending=[True, False]
+    )
+
+    return detail_df, summary_df
+
+
+# ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
 tab_pred, tab_summary, tab_actual, tab_backtest = st.tabs(
@@ -1623,7 +1933,7 @@ with tab_backtest:
             )
 
         
-# ----------------------------------------------------
+        # ----------------------------------------------------
         # Prediction vs Actual Global
         # ----------------------------------------------------
         st.markdown(
@@ -1690,6 +2000,152 @@ with tab_backtest:
                 mime="text/csv",
                 key="download_prediction_vs_actual_global"
             )
+
+
+        # ----------------------------------------------------
+        # Prediction vs Actual by Tournament
+        # ----------------------------------------------------
+        st.markdown("### Prediction vs Actual by Tournament")
+
+        tournament_detail_df, tournament_summary_df = (
+            build_prediction_vs_actual_tournament(
+                pred_df,
+                actual_df
+            )
+        )
+
+        if not tournament_detail_df.empty:
+
+            # -----------------------------------------------
+            # Strategy / Tournament Summary
+            # -----------------------------------------------
+            st.markdown("#### Strategy Summary")
+
+            st.dataframe(
+                tournament_summary_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download prediction_vs_actual_tournament_summary.csv",
+                dataframe_to_csv_bytes(
+                    tournament_summary_df
+                ),
+                file_name="prediction_vs_actual_tournament_summary.csv",
+                mime="text/csv",
+                key="download_prediction_vs_actual_tournament_summary"
+            )
+
+            # -----------------------------------------------
+            # KPI
+            # -----------------------------------------------
+            k1, k2, k3 = st.columns(3)
+
+            with k1:
+                st.metric(
+                    "Tournament Rows",
+                    len(tournament_detail_df)
+                )
+
+            with k2:
+                avg_efficiency = (
+                    tournament_summary_df["efficiency_ratio"].mean()
+                    if "efficiency_ratio" in tournament_summary_df.columns
+                    else 0
+                )
+
+                st.metric(
+                    "Avg Team Efficiency",
+                    round(avg_efficiency, 3)
+                )
+
+            with k3:
+                total_error = (
+                    tournament_summary_df["prediction_error"].sum()
+                    if "prediction_error" in tournament_summary_df.columns
+                    else 0
+                )
+
+                st.metric(
+                    "Total Team Error",
+                    round(total_error, 2)
+                )
+
+            # -----------------------------------------------
+            # Filters
+            # -----------------------------------------------
+            st.markdown("#### Player Detail")
+
+            tournament_options = (
+                ["All Tournaments"]
+                + sorted(
+                    tournament_detail_df["tournament"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+            )
+
+            selected_bt_tournament = st.selectbox(
+                "Filter tournament",
+                tournament_options,
+                key="bt_tournament_filter"
+            )
+
+            strategy_options = (
+                ["All Strategies"]
+                + sorted(
+                    tournament_detail_df["strategy"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+            )
+
+            selected_bt_strategy = st.selectbox(
+                "Filter strategy",
+                strategy_options,
+                key="bt_strategy_filter"
+            )
+
+            filtered_tournament_detail = tournament_detail_df.copy()
+
+            if selected_bt_tournament != "All Tournaments":
+                filtered_tournament_detail = filtered_tournament_detail[
+                    filtered_tournament_detail["tournament"]
+                    == selected_bt_tournament
+                ].copy()
+
+            if selected_bt_strategy != "All Strategies":
+                filtered_tournament_detail = filtered_tournament_detail[
+                    filtered_tournament_detail["strategy"]
+                    == selected_bt_strategy
+                ].copy()
+
+            st.dataframe(
+                filtered_tournament_detail,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download prediction_vs_actual_tournament_detail.csv",
+                dataframe_to_csv_bytes(
+                    tournament_detail_df
+                ),
+                file_name="prediction_vs_actual_tournament_detail.csv",
+                mime="text/csv",
+                key="download_prediction_vs_actual_tournament_detail"
+            )
+
+        else:
+            st.info(
+                "Prediction vs Actual by Tournament is not available. Check tournament mapping and required columns."
+            )
+
 
         # ----------------------------------------------------
         # Loaded Data Summary
