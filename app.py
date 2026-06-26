@@ -813,6 +813,24 @@ def build_prediction_vs_actual_tournament(
         .reset_index()
     )
 
+    # --------------------------------------------------------
+    # Prediction Rank within Tournament + Strategy
+    # --------------------------------------------------------
+    prediction_summary["prediction_rank"] = (
+        prediction_summary
+        .groupby(
+            [
+                "tournament",
+                "strategy"
+            ]
+        )["expected_points"]
+        .rank(
+            method="dense",
+            ascending=False
+        )
+        .astype(int)
+    )
+
     rows = []
 
     for _, pred_row in prediction_summary.iterrows():
@@ -912,6 +930,12 @@ def build_prediction_vs_actual_tournament(
                     else ""
                 ),
                 "actual_matches_in_tournament": len(actual_tournament_df),
+                "prediction_rank": int(
+                    pred_row.get(
+                        "prediction_rank",
+                         0
+                    )
+                ),
             }
         )
 
@@ -971,7 +995,7 @@ def build_prediction_vs_actual_tournament(
             "strategy",
             "prediction_error"
         ],
-        ascending=[True, True, False]
+        ascending=[True, True, True]
     )
 
     summary_df = summary_df.sort_values(
