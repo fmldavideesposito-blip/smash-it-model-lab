@@ -1512,7 +1512,8 @@ else:
             # ----------------------------------------------------
             # Strategy Snapshot
             # ----------------------------------------------------
-            st.markdown("### Strategy Snapshot")
+
+st.markdown("### Strategy Snapshot")
 
 strategy_summary = (
                 master_df
