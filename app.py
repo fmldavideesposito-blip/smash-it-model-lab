@@ -392,18 +392,12 @@ def build_prediction_vs_actual_global(
 
     prediction_summary["player_norm"] = (
         prediction_summary["player"]
-        .astype(str)
-        .str.lower()
-        .str.strip()
-    )
-
-    actual_wins = actual_wins.copy()
+        .apply(normalize_player_name)
+        )
 
     actual_wins["player_norm"] = (
         actual_wins["player"]
-        .astype(str)
-        .str.lower()
-        .str.strip()
+        .apply(normalize_player_name)
     )
 
     merged = pd.merge(
