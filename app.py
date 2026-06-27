@@ -985,40 +985,71 @@ def build_prediction_vs_actual_tournament(
     return detail_df, summary_df
 
 def enrich_prediction_warehouse_with_actuals(
-    pred_df,
-    tournament_detail_df
-):
+    pred_df: pd.DataFrame,
+    tournament_detail_df: pd.DataFrame
+) -> pd.DataFrame:
     """
-    Riporta nel Prediction Warehouse:
+    Arricchisce il Prediction Warehouse con gli actual calcolati
+    da build_prediction_vs_actual_tournament().
+
+    Riempie:
     - actual_points
     - actual_wins
     - actual_matches_played
+    - actual_best_round
     - prediction_error
     - efficiency_ratio
-    - actual_best_round
     """
 
-    if pred_df.empty or tournament_detail_df.empty:
-        return pred_df
+    if pred_df is None or pred_df.empty:
+        return pd.DataFrame()
+
+    if tournament_detail_df is None or tournament_detail_df.empty:
+        return pred_df.copy()
 
     warehouse = pred_df.copy()
     detail = tournament_detail_df.copy()
 
-    merge_keys = [
-        c for c in [
-            "run_id",
-            "tournament",
-            "year",
-            "surface",
-            "strategy",
-            "player"
-        ]
-        if c in warehouse.columns
-        and c in detail.columns
+    # --------------------------------------------------------
+    # Normalizzazione colonne chiave
+    # --------------------------------------------------------
+    if "year" in warehouse.columns:
+        warehouse["year"] = pd.to_numeric(
+            warehouse["year"],
+            errors="coerce"
+        ).fillna(0).astype(int)
+
+    if "year" in detail.columns:
+        detail["year"] = pd.to_numeric(
+            detail["year"],
+            errors="coerce"
+        ).fillna(0).astype(int)
+
+    # --------------------------------------------------------
+    # Chiavi di merge
+    # --------------------------------------------------------
+    preferred_keys = [
+        "run_id",
+        "tournament",
+        "year",
+        "surface",
+        "strategy",
+        "player"
     ]
 
-    detail_small = detail[
-        merge_keys + [
+    merge_keys = [
+        c for c in preferred_keys
+        if c in warehouse.columns and c in detail.columns
+    ]
+
+    if not merge_keys:
+        return warehouse
+
+    # --------------------------------------------------------
+    # Colonne calcolate dal backtesting
+    # --------------------------------------------------------
+    detail_cols = [
+        c for c in [
             "actual_points",
             "actual_wins",
             "actual_matches_played",
@@ -1026,26 +1057,105 @@ def enrich_prediction_warehouse_with_actuals(
             "efficiency_ratio",
             "rounds_won"
         ]
-    ].copy()
+        if c in detail.columns
+    ]
 
-    warehouse = warehouse.merge(
+    if not detail_cols:
+        return warehouse
+
+    detail_small = (
+        detail[
+            merge_keys + detail_cols
+        ]
+        .drop_duplicates(
+            subset=merge_keys
+        )
+        .copy()
+    )
+
+    merged = warehouse.merge(
         detail_small,
         on=merge_keys,
         how="left",
         suffixes=("", "_bt")
     )
 
-    warehouse["actual_best_round"] = (
-        warehouse["rounds_won"]
-    )
+    # --------------------------------------------------------
+    # Helper: riempie le colonne vuote originali con i valori _bt
+    # --------------------------------------------------------
+    def fill_from_backtest(target_col, source_col):
 
-    warehouse.drop(
-        columns=["rounds_won"],
-        inplace=True,
+        if source_col not in merged.columns:
+            return
+
+        if target_col not in merged.columns:
+            merged[target_col] = pd.NA
+
+        merged[target_col] = (
+            merged[target_col]
+            .replace(
+                {
+                    "": pd.NA,
+                    "None": pd.NA,
+                    "none": pd.NA,
+                    "nan": pd.NA,
+                    "NaN": pd.NA
+                }
+            )
+        )
+
+        merged[target_col] = merged[target_col].combine_first(
+            merged[source_col]
+        )
+
+    fill_from_backtest("actual_points", "actual_points_bt")
+    fill_from_backtest("actual_wins", "actual_wins_bt")
+    fill_from_backtest("actual_matches_played", "actual_matches_played_bt")
+    fill_from_backtest("prediction_error", "prediction_error_bt")
+    fill_from_backtest("efficiency_ratio", "efficiency_ratio_bt")
+
+    # --------------------------------------------------------
+    # actual_best_round deriva da rounds_won
+    # --------------------------------------------------------
+    if "rounds_won" in merged.columns:
+
+        if "actual_best_round" not in merged.columns:
+            merged["actual_best_round"] = pd.NA
+
+        merged["actual_best_round"] = (
+            merged["actual_best_round"]
+            .replace(
+                {
+                    "": pd.NA,
+                    "None": pd.NA,
+                    "none": pd.NA,
+                    "nan": pd.NA,
+                    "NaN": pd.NA
+                }
+            )
+        )
+
+        merged["actual_best_round"] = (
+            merged["actual_best_round"]
+            .combine_first(
+                merged["rounds_won"]
+            )
+        )
+
+    # --------------------------------------------------------
+    # Rimuove colonne tecniche duplicate
+    # --------------------------------------------------------
+    cols_to_drop = [
+        c for c in merged.columns
+        if c.endswith("_bt") or c == "rounds_won"
+    ]
+
+    merged = merged.drop(
+        columns=cols_to_drop,
         errors="ignore"
     )
 
-    return warehouse
+    return merged
 
 # ------------------------------------------------------------
 # Tabs principali
@@ -1465,16 +1575,6 @@ with tab_summary:
             # ----------------------------------------------------
             # Download Warehouse
             # ----------------------------------------------------
-            display_master_df = st.session_state.get(
-                "prediction_log_master_enriched",
-                master_df
-            )
-
-            display_master_df = st.session_state.get(
-                "prediction_log_master_enriched",
-                master_df
-            )
-
             st.download_button(
                 "⬇️ Download prediction_warehouse.csv",
                 dataframe_to_csv_bytes(
@@ -2080,6 +2180,17 @@ with tab_backtest:
                 key="download_prediction_vs_actual_global"
             )
 
+                # ----------------------------------------------------
+        # Prediction vs Actual by Tournament
+        # ----------------------------------------------------
+        st.markdown("### Prediction vs Actual by Tournament")
+
+        tournament_detail_df, tournament_summary_df = (
+            build_prediction_vs_actual_tournament(
+                pred_df,
+                actual_df
+            )
+        )
 
         # ----------------------------------------------------
         # Enriched Prediction Warehouse
@@ -2092,185 +2203,171 @@ with tab_backtest:
         )
 
         st.session_state[
-         "prediction_log_master_enriched"
-        ] = enriched_prediction_warehouse
-
-        
-    ) -> pd.DataFrame:
-    """
-    Arricchisce il Prediction Warehouse con gli actual calcolati
-    da build_prediction_vs_actual_tournament().
-
-    Riempie:
-    - actual_points
-    - actual_wins
-    - actual_matches_played
-    - actual_best_round
-    - prediction_error
-    - efficiency_ratio
-    """
-
-    if pred_df is None or pred_df.empty:
-        return pd.DataFrame()
-
-    if tournament_detail_df is None or tournament_detail_df.empty:
-        return pred_df.copy()
-
-    warehouse = pred_df.copy()
-    detail = tournament_detail_df.copy()
-
-    # --------------------------------------------------------
-    # Normalizzazione tipi chiave
-    # --------------------------------------------------------
-    if "year" in warehouse.columns:
-        warehouse["year"] = pd.to_numeric(
-            warehouse["year"],
-            errors="coerce"
-        ).fillna(0).astype(int)
-
-    if "year" in detail.columns:
-        detail["year"] = pd.to_numeric(
-            detail["year"],
-            errors="coerce"
-        ).fillna(0).astype(int)
-
-    # --------------------------------------------------------
-    # Chiavi di merge
-    # --------------------------------------------------------
-    preferred_keys = [
-        "run_id",
-        "tournament",
-        "year",
-        "surface",
-        "strategy",
-        "player"
-    ]
-
-    merge_keys = [
-        c for c in preferred_keys
-        if c in warehouse.columns and c in detail.columns
-    ]
-
-    if not merge_keys:
-        return warehouse
-
-    # --------------------------------------------------------
-    # Colonne actual calcolate dal backtesting
-    # --------------------------------------------------------
-    actual_cols_from_detail = [
-        c for c in [
-            "actual_points",
-            "actual_wins",
-            "actual_matches_played",
-            "prediction_error",
-            "efficiency_ratio",
-            "rounds_won"
-        ]
-        if c in detail.columns
-    ]
-
-    if not actual_cols_from_detail:
-        return warehouse
-
-    detail_small = (
-        detail[
-            merge_keys + actual_cols_from_detail
-        ]
-        .drop_duplicates(
-            subset=merge_keys
-        )
-        .copy()
-    )
-
-    merged = warehouse.merge(
-        detail_small,
-        on=merge_keys,
-        how="left",
-        suffixes=("", "_bt")
-    )
-
-    # --------------------------------------------------------
-    # Helper per riempire colonne vuote con valori backtest
-    # --------------------------------------------------------
-    def fill_column(target_col, bt_col):
-
-        if bt_col not in merged.columns:
-            return
-
-        if target_col not in merged.columns:
-            merged[target_col] = pd.NA
-
-        merged[target_col] = (
-            merged[target_col]
-            .replace(
-                {
-                    "": pd.NA,
-                    "None": pd.NA,
-                    "none": pd.NA,
-                    "nan": pd.NA,
-                    "NaN": pd.NA
-                }
-            )
-        )
-
-        merged[target_col] = merged[target_col].combine_first(
-            merged[bt_col]
-        )
-
-    fill_column("actual_points", "actual_points_bt")
-    fill_column("actual_wins", "actual_wins_bt")
-    fill_column("actual_matches_played", "actual_matches_played_bt")
-    fill_column("prediction_error", "prediction_error_bt")
-    fill_column("efficiency_ratio", "efficiency_ratio_bt")
-
-    # --------------------------------------------------------
-    # actual_best_round deriva da rounds_won
-    # --------------------------------------------------------
-    if "rounds_won" in merged.columns:
-
-        if "actual_best_round" not in merged.columns:
-            merged["actual_best_round"] = pd.NA
-
-        merged["actual_best_round"] = (
-            merged["actual_best_round"]
-            .replace(
-                {
-                    "": pd.NA,
-                    "None": pd.NA,
-                    "none": pd.NA,
-                    "nan": pd.NA,
-                    "NaN": pd.NA
-                }
-            )
-        )
-
-        merged["actual_best_round"] = (
-            merged["actual_best_round"]
-            .combine_first(
-                merged["rounds_won"]
-            )
-        )
-
-    # --------------------------------------------------------
-    # Rimuove colonne tecniche duplicate
-    # --------------------------------------------------------
-    cols_to_drop = [
-        c for c in merged.columns
-        if c.endswith("_bt") or c == "rounds_won"
-    ]
-
-    merged = merged.drop(
-        columns=cols_to_drop,
-        errors="ignore"
-    )
-
-    return merged
-        )
-
-        st.session_state[
             "prediction_log_master_enriched"
         ] = enriched_prediction_warehouse
 
+        if not tournament_detail_df.empty:
+
+            # -----------------------------------------------
+            # Strategy / Tournament Summary
+            # -----------------------------------------------
+            st.markdown("#### Strategy Summary")
+
+            st.dataframe(
+                tournament_summary_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download prediction_vs_actual_tournament_summary.csv",
+                dataframe_to_csv_bytes(
+                    tournament_summary_df
+                ),
+                file_name="prediction_vs_actual_tournament_summary.csv",
+                mime="text/csv",
+                key="download_prediction_vs_actual_tournament_summary"
+            )
+
+            # -----------------------------------------------
+            # KPI
+            # -----------------------------------------------
+            k1, k2, k3 = st.columns(3)
+
+            with k1:
+                st.metric(
+                    "Tournament Rows",
+                    len(tournament_detail_df)
+                )
+
+            with k2:
+                avg_efficiency = (
+                    tournament_summary_df["efficiency_ratio"].mean()
+                    if "efficiency_ratio" in tournament_summary_df.columns
+                    else 0
+                )
+
+                st.metric(
+                    "Avg Team Efficiency",
+                    round(avg_efficiency, 3)
+                )
+
+            with k3:
+                total_error = (
+                    tournament_summary_df["prediction_error"].sum()
+                    if "prediction_error" in tournament_summary_df.columns
+                    else 0
+                )
+
+                st.metric(
+                    "Total Team Error",
+                    round(total_error, 2)
+                )
+
+            # -----------------------------------------------
+            # Enriched Full Prediction Warehouse
+            # -----------------------------------------------
+            st.markdown("#### Enriched Full Prediction Warehouse")
+
+            if (
+                "prediction_log_master_enriched" in st.session_state
+                and not st.session_state["prediction_log_master_enriched"].empty
+            ):
+
+                enriched_preview_df = st.session_state[
+                    "prediction_log_master_enriched"
+                ]
+
+                st.dataframe(
+                    enriched_preview_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                st.download_button(
+                    "⬇️ Download enriched_prediction_warehouse.csv",
+                    dataframe_to_csv_bytes(
+                        enriched_preview_df
+                    ),
+                    file_name="enriched_prediction_warehouse.csv",
+                    mime="text/csv",
+                    key="download_enriched_prediction_warehouse"
+                )
+
+            # -----------------------------------------------
+            # Filters
+            # -----------------------------------------------
+            st.markdown("#### Player Detail")
+
+            tournament_options = (
+                ["All Tournaments"]
+                + sorted(
+                    tournament_detail_df["tournament"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+            )
+
+            selected_bt_tournament = st.selectbox(
+                "Filter tournament",
+                tournament_options,
+                key="bt_tournament_filter"
+            )
+
+            strategy_options = (
+                ["All Strategies"]
+                + sorted(
+                    tournament_detail_df["strategy"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+            )
+
+            selected_bt_strategy = st.selectbox(
+                "Filter strategy",
+                strategy_options,
+                key="bt_strategy_filter"
+            )
+
+            filtered_tournament_detail = tournament_detail_df.copy()
+
+            if selected_bt_tournament != "All Tournaments":
+                filtered_tournament_detail = filtered_tournament_detail[
+                    filtered_tournament_detail["tournament"]
+                    == selected_bt_tournament
+                ].copy()
+
+            if selected_bt_strategy != "All Strategies":
+                filtered_tournament_detail = filtered_tournament_detail[
+                    filtered_tournament_detail["strategy"]
+                    == selected_bt_strategy
+                ].copy()
+
+            st.dataframe(
+                filtered_tournament_detail,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                "⬇️ Download prediction_vs_actual_tournament_detail.csv",
+                dataframe_to_csv_bytes(
+                    tournament_detail_df
+                ),
+                file_name="prediction_vs_actual_tournament_detail.csv",
+                mime="text/csv",
+                key="download_prediction_vs_actual_tournament_detail"
+            )
+
+        else:
+            st.info(
+                "Prediction vs Actual by Tournament is not available. Check tournament mapping and required columns."
+            )
+        
         if not tournament_detail_df.empty:
 
             # -----------------------------------------------
