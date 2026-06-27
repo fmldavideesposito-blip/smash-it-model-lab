@@ -2388,7 +2388,7 @@ with tab_backtest:
                 ),
                 file_name="prediction_vs_actual_tournament_summary.csv",
                 mime="text/csv",
-                key="download_prediction_vs_actual_tournament_summary"
+                key="download_prediction_vs_actual_tournament_summary_v2"
             )
 
             # -----------------------------------------------
@@ -2418,7 +2418,7 @@ with tab_backtest:
                     ),
                     file_name="enriched_prediction_warehouse.csv",
                     mime="text/csv",
-                    key="download_enriched_prediction_warehouse"
+                    key="download_enriched_prediction_warehouse_v2"
                 )
 
             # -----------------------------------------------
@@ -2522,7 +2522,7 @@ with tab_backtest:
                 ),
                 file_name="prediction_vs_actual_tournament_detail.csv",
                 mime="text/csv",
-                key="download_prediction_vs_actual_tournament_detail"
+                key="download_prediction_vs_actual_tournament_detail_v2"
             )
 
         else:
