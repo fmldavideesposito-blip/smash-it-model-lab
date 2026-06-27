@@ -984,6 +984,68 @@ def build_prediction_vs_actual_tournament(
 
     return detail_df, summary_df
 
+def enrich_prediction_warehouse_with_actuals(
+    pred_df,
+    tournament_detail_df
+):
+    """
+    Riporta nel Prediction Warehouse:
+    - actual_points
+    - actual_wins
+    - actual_matches_played
+    - prediction_error
+    - efficiency_ratio
+    - actual_best_round
+    """
+
+    if pred_df.empty or tournament_detail_df.empty:
+        return pred_df
+
+    warehouse = pred_df.copy()
+    detail = tournament_detail_df.copy()
+
+    merge_keys = [
+        c for c in [
+            "run_id",
+            "tournament",
+            "year",
+            "surface",
+            "strategy",
+            "player"
+        ]
+        if c in warehouse.columns
+        and c in detail.columns
+    ]
+
+    detail_small = detail[
+        merge_keys + [
+            "actual_points",
+            "actual_wins",
+            "actual_matches_played",
+            "prediction_error",
+            "efficiency_ratio",
+            "rounds_won"
+        ]
+    ].copy()
+
+    warehouse = warehouse.merge(
+        detail_small,
+        on=merge_keys,
+        how="left",
+        suffixes=("", "_bt")
+    )
+
+    warehouse["actual_best_round"] = (
+        warehouse["rounds_won"]
+    )
+
+    warehouse.drop(
+        columns=["rounds_won"],
+        inplace=True,
+        errors="ignore"
+    )
+
+    return warehouse
 
 # ------------------------------------------------------------
 # Tabs principali
@@ -1389,18 +1451,28 @@ with tab_summary:
             # ----------------------------------------------------
             st.markdown("### Full Prediction Warehouse")
 
+            display_master_df = st.session_state.get(
+            "prediction_log_master_enriched",
+             master_df
+            )
+
             st.dataframe(
-                master_df,
-                use_container_width=True,
-                hide_index=True
+            display_master_df,
+            use_container_width=True,
+            hide_index=True
             )
 
             # ----------------------------------------------------
             # Download Warehouse
             # ----------------------------------------------------
+            display_master_df = st.session_state.get(
+    "prediction_log_master_enriched",
+    master_df
+)
+
             st.download_button(
                 "⬇️ Download prediction_warehouse.csv",
-                dataframe_to_csv_bytes(master_df),
+                 dataframe_to_csv_bytes(display_master_df),
                 file_name="prediction_warehouse.csv",
                 mime="text/csv",
                 key="warehouse_download"
@@ -2013,6 +2085,20 @@ with tab_backtest:
                 actual_df
             )
         )
+
+        # ----------------------------------------------------
+        # Enrich Prediction Warehouse
+        # ----------------------------------------------------
+        enriched_prediction_warehouse = (
+            enrich_prediction_warehouse_with_actuals(
+                pred_df,
+                tournament_detail_df
+            )
+        )
+
+        st.session_state[
+            "prediction_log_master_enriched"
+        ] = enriched_prediction_warehouse
 
         if not tournament_detail_df.empty:
 
