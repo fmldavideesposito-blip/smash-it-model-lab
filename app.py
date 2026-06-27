@@ -1452,27 +1452,34 @@ with tab_summary:
             st.markdown("### Full Prediction Warehouse")
 
             display_master_df = st.session_state.get(
-            "prediction_log_master_enriched",
-             master_df
+                "prediction_log_master_enriched",
+                master_df
             )
 
             st.dataframe(
-            display_master_df,
-            use_container_width=True,
-            hide_index=True
+                display_master_df,
+                use_container_width=True,
+                hide_index=True
             )
 
             # ----------------------------------------------------
             # Download Warehouse
             # ----------------------------------------------------
             display_master_df = st.session_state.get(
-    "prediction_log_master_enriched",
-    master_df
-)
+                "prediction_log_master_enriched",
+                master_df
+            )
+
+            display_master_df = st.session_state.get(
+                "prediction_log_master_enriched",
+                master_df
+            )
 
             st.download_button(
                 "⬇️ Download prediction_warehouse.csv",
-                 dataframe_to_csv_bytes(display_master_df),
+                dataframe_to_csv_bytes(
+                    display_master_df
+                ),
                 file_name="prediction_warehouse.csv",
                 mime="text/csv",
                 key="warehouse_download"
@@ -2075,25 +2082,189 @@ with tab_backtest:
 
 
         # ----------------------------------------------------
-        # Prediction vs Actual by Tournament
-        # ----------------------------------------------------
-        st.markdown("### Prediction vs Actual by Tournament")
-
-        tournament_detail_df, tournament_summary_df = (
-            build_prediction_vs_actual_tournament(
-                pred_df,
-                actual_df
-            )
-        )
-
-        # ----------------------------------------------------
-        # Enrich Prediction Warehouse
+        # Enriched Prediction Warehouse
         # ----------------------------------------------------
         enriched_prediction_warehouse = (
             enrich_prediction_warehouse_with_actuals(
                 pred_df,
                 tournament_detail_df
             )
+        )
+
+        st.session_state[
+         "prediction_log_master_enriched"
+        ] = enriched_prediction_warehouse
+
+        
+    ) -> pd.DataFrame:
+    """
+    Arricchisce il Prediction Warehouse con gli actual calcolati
+    da build_prediction_vs_actual_tournament().
+
+    Riempie:
+    - actual_points
+    - actual_wins
+    - actual_matches_played
+    - actual_best_round
+    - prediction_error
+    - efficiency_ratio
+    """
+
+    if pred_df is None or pred_df.empty:
+        return pd.DataFrame()
+
+    if tournament_detail_df is None or tournament_detail_df.empty:
+        return pred_df.copy()
+
+    warehouse = pred_df.copy()
+    detail = tournament_detail_df.copy()
+
+    # --------------------------------------------------------
+    # Normalizzazione tipi chiave
+    # --------------------------------------------------------
+    if "year" in warehouse.columns:
+        warehouse["year"] = pd.to_numeric(
+            warehouse["year"],
+            errors="coerce"
+        ).fillna(0).astype(int)
+
+    if "year" in detail.columns:
+        detail["year"] = pd.to_numeric(
+            detail["year"],
+            errors="coerce"
+        ).fillna(0).astype(int)
+
+    # --------------------------------------------------------
+    # Chiavi di merge
+    # --------------------------------------------------------
+    preferred_keys = [
+        "run_id",
+        "tournament",
+        "year",
+        "surface",
+        "strategy",
+        "player"
+    ]
+
+    merge_keys = [
+        c for c in preferred_keys
+        if c in warehouse.columns and c in detail.columns
+    ]
+
+    if not merge_keys:
+        return warehouse
+
+    # --------------------------------------------------------
+    # Colonne actual calcolate dal backtesting
+    # --------------------------------------------------------
+    actual_cols_from_detail = [
+        c for c in [
+            "actual_points",
+            "actual_wins",
+            "actual_matches_played",
+            "prediction_error",
+            "efficiency_ratio",
+            "rounds_won"
+        ]
+        if c in detail.columns
+    ]
+
+    if not actual_cols_from_detail:
+        return warehouse
+
+    detail_small = (
+        detail[
+            merge_keys + actual_cols_from_detail
+        ]
+        .drop_duplicates(
+            subset=merge_keys
+        )
+        .copy()
+    )
+
+    merged = warehouse.merge(
+        detail_small,
+        on=merge_keys,
+        how="left",
+        suffixes=("", "_bt")
+    )
+
+    # --------------------------------------------------------
+    # Helper per riempire colonne vuote con valori backtest
+    # --------------------------------------------------------
+    def fill_column(target_col, bt_col):
+
+        if bt_col not in merged.columns:
+            return
+
+        if target_col not in merged.columns:
+            merged[target_col] = pd.NA
+
+        merged[target_col] = (
+            merged[target_col]
+            .replace(
+                {
+                    "": pd.NA,
+                    "None": pd.NA,
+                    "none": pd.NA,
+                    "nan": pd.NA,
+                    "NaN": pd.NA
+                }
+            )
+        )
+
+        merged[target_col] = merged[target_col].combine_first(
+            merged[bt_col]
+        )
+
+    fill_column("actual_points", "actual_points_bt")
+    fill_column("actual_wins", "actual_wins_bt")
+    fill_column("actual_matches_played", "actual_matches_played_bt")
+    fill_column("prediction_error", "prediction_error_bt")
+    fill_column("efficiency_ratio", "efficiency_ratio_bt")
+
+    # --------------------------------------------------------
+    # actual_best_round deriva da rounds_won
+    # --------------------------------------------------------
+    if "rounds_won" in merged.columns:
+
+        if "actual_best_round" not in merged.columns:
+            merged["actual_best_round"] = pd.NA
+
+        merged["actual_best_round"] = (
+            merged["actual_best_round"]
+            .replace(
+                {
+                    "": pd.NA,
+                    "None": pd.NA,
+                    "none": pd.NA,
+                    "nan": pd.NA,
+                    "NaN": pd.NA
+                }
+            )
+        )
+
+        merged["actual_best_round"] = (
+            merged["actual_best_round"]
+            .combine_first(
+                merged["rounds_won"]
+            )
+        )
+
+    # --------------------------------------------------------
+    # Rimuove colonne tecniche duplicate
+    # --------------------------------------------------------
+    cols_to_drop = [
+        c for c in merged.columns
+        if c.endswith("_bt") or c == "rounds_won"
+    ]
+
+    merged = merged.drop(
+        columns=cols_to_drop,
+        errors="ignore"
+    )
+
+    return merged
         )
 
         st.session_state[
@@ -2122,6 +2293,36 @@ with tab_backtest:
                 mime="text/csv",
                 key="download_prediction_vs_actual_tournament_summary"
             )
+
+            # -----------------------------------------------
+            # Enriched Full Prediction Warehouse
+            # -----------------------------------------------
+            st.markdown("#### Enriched Full Prediction Warehouse")
+
+            if (
+                "prediction_log_master_enriched" in st.session_state
+                and not st.session_state["prediction_log_master_enriched"].empty
+            ):
+
+                enriched_preview_df = st.session_state[
+                    "prediction_log_master_enriched"
+                ]
+
+                st.dataframe(
+                    enriched_preview_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                st.download_button(
+                    "⬇️ Download enriched_prediction_warehouse.csv",
+                    dataframe_to_csv_bytes(
+                        enriched_preview_df
+                    ),
+                    file_name="enriched_prediction_warehouse.csv",
+                    mime="text/csv",
+                    key="download_enriched_prediction_warehouse"
+                )
 
             # -----------------------------------------------
             # KPI
