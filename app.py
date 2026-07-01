@@ -2261,19 +2261,20 @@ with tab_backtest:
                 hide_index=True
             )
 
-            st.download_button(
-                "⬇️ Download prediction_vs_actual_global.csv",
-                dataframe_to_csv_bytes(
-                    prediction_actual_df
-                ),
-                file_name="prediction_vs_actual_global.csv",
-                mime="text/csv",
-                key="download_prediction_vs_actual_global"
-            )
+           st.download_button(
+            "⬇️ Download prediction_vs_actual_global.csv",
+            dataframe_to_csv_bytes(
+            prediction_actual_df
+            ),
+            file_name="prediction_vs_actual_global.csv",
+            mime="text/csv",
+            key="download_prediction_vs_actual_global"
+        )
 
-                # ----------------------------------------------------
-        # Prediction vs Actual by Tournament
-        # ----------------------------------------------------
+            # ----------------------------------------------------
+            # Prediction vs Actual by Tournament
+            # ----------------------------------------------------
+st.markdown("### Prediction vs Actual by Tournament")
         st.markdown("### Prediction vs Actual by Tournament")
 
         tournament_detail_df, tournament_summary_df = (
@@ -2495,39 +2496,35 @@ with tab_backtest:
 # ------------------------------------------------------------
 with tab_calibration:
 
-    st.subheader(
-        "Weight Calibration Lab"
-    )
+    st.subheader("Weight Calibration Lab")
 
-if (
-        "prediction_log_master_enriched"
-        not in st.session_state
-    ):
+    if "prediction_log_master_enriched" not in st.session_state:
 
-        st.info(
-            "Esegui prima il Backtesting."
-        )
+        st.info("Esegui prima il Backtesting.")
 
     else:
 
         training_df = (
-            st.session_state[
-                "prediction_log_master_enriched"
-            ]
+            st.session_state["prediction_log_master_enriched"]
             .copy()
         )
 
-training_df["actual_points"] = pd.to_numeric(
+        # ----------------------------
+        # Clean dataset
+        # ----------------------------
+        training_df["actual_points"] = pd.to_numeric(
             training_df["actual_points"],
             errors="coerce"
         )
 
         training_df = training_df[
-            training_df["actual_points"]
-            .notna()
+            training_df["actual_points"].notna()
         ].copy()
 
-c1, c2 = st.columns(2)
+        # ----------------------------
+        # KPI
+        # ----------------------------
+        c1, c2 = st.columns(2)
 
         with c1:
             st.metric(
@@ -2541,21 +2538,16 @@ c1, c2 = st.columns(2)
                 training_df["player"].nunique()
             )
 
-corr_df = (
-            build_feature_correlation_report(
-                training_df
-            )
-        )
+        # ----------------------------
+        # Correlation
+        # ----------------------------
+        corr_df = build_feature_correlation_report(training_df)
 
-st.markdown(
-            "### Feature Correlation"
-        )
+        st.markdown("### Feature Correlation")
 
         if corr_df.empty:
 
-            st.warning(
-                "Dataset troppo piccolo."
-            )
+            st.warning("Dataset troppo piccolo.")
 
         else:
 
@@ -2565,9 +2557,7 @@ st.markdown(
                 hide_index=True
             )
 
-st.markdown(
-                "### Top Predictors"
-            )
+            st.markdown("### Top Predictors")
 
             st.dataframe(
                 corr_df.head(10),
@@ -2575,11 +2565,9 @@ st.markdown(
                 hide_index=True
             )
 
-st.download_button(
+            st.download_button(
                 "⬇️ Download feature_correlation.csv",
-                dataframe_to_csv_bytes(
-                    corr_df
-                ),
+                dataframe_to_csv_bytes(corr_df),
                 file_name="feature_correlation.csv",
                 mime="text/csv",
                 key="download_feature_correlation"
