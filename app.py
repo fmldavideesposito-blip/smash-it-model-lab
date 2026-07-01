@@ -2261,22 +2261,22 @@ with tab_backtest:
                 hide_index=True
             )
 
-           st.download_button(
-            "⬇️ Download prediction_vs_actual_global.csv",
-            dataframe_to_csv_bytes(
-            prediction_actual_df
-            ),
-            file_name="prediction_vs_actual_global.csv",
-            mime="text/csv",
-            key="download_prediction_vs_actual_global"
-        )
+        st.download_button(
+                "⬇️ Download prediction_vs_actual_global.csv",
+                dataframe_to_csv_bytes(
+                prediction_actual_df
+                ),
+                file_name="prediction_vs_actual_global.csv",
+                mime="text/csv",
+                key="download_prediction_vs_actual_global"
+                )
 
-            # ----------------------------------------------------
-            # Prediction vs Actual by Tournament
-            # ----------------------------------------------------
-st.markdown("### Prediction vs Actual by Tournament")
+        # ----------------------------------------------------
+        # Prediction vs Actual by Tournament
+        # ----------------------------------------------------
+        
         st.markdown("### Prediction vs Actual by Tournament")
-
+       
         tournament_detail_df, tournament_summary_df = (
             build_prediction_vs_actual_tournament(
                 pred_df,
