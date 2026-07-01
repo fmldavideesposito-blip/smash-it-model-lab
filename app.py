@@ -2261,10 +2261,10 @@ with tab_backtest:
                 hide_index=True
             )
 
-        st.download_button(
+            st.download_button(
                 "⬇️ Download prediction_vs_actual_global.csv",
                 dataframe_to_csv_bytes(
-                prediction_actual_df
+                    prediction_actual_df
                 ),
                 file_name="prediction_vs_actual_global.csv",
                 mime="text/csv",
