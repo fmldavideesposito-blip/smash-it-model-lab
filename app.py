@@ -1947,6 +1947,7 @@ with tab_actual:
 
 FEATURE_COLUMNS = [
 
+    "elo_win_probability",
     "selected_surface_elo",
     "overall_elo",
     "peak_elo",
@@ -1970,6 +1971,31 @@ FEATURE_COLUMNS = [
     "matches_in_db"
 
 ]
+
+def elo_to_win_probability(
+    elo_value,
+    reference_elo=2000
+):
+    """
+    Trasforma Elo in probabilità di vittoria
+    rispetto ad un giocatore di riferimento.
+
+    2000 è una buona baseline ATP.
+    """
+
+    try:
+
+        elo_diff = (
+            float(elo_value)
+            - float(reference_elo)
+        )
+
+        return 1 / (
+            1 + 10 ** (-elo_diff / 400)
+        )
+
+    except Exception:
+        return None
 
 def build_feature_correlation_report(
     training_df
@@ -2508,6 +2534,18 @@ with tab_calibration:
             st.session_state["prediction_log_master_enriched"]
             .copy()
         )
+
+        if "selected_surface_elo" in training_df.columns:
+
+            training_df["elo_win_probability"] = (
+                training_df["selected_surface_elo"]
+                .apply(
+                    lambda x: elo_to_win_probability(
+                     x,
+                        reference_elo=2000
+                 )
+             )
+            )
 
         # ----------------------------
         # Clean dataset
