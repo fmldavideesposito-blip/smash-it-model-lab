@@ -1160,12 +1160,13 @@ def enrich_prediction_warehouse_with_actuals(
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
-tab_pred, tab_summary, tab_actual, tab_backtest = st.tabs(
+tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration = st.tabs(
     [
         "Predictions",
         "Prediction Warehouse",
         "Actual Results",
-        "Backtesting"
+        "Backtesting",
+        "🧪 Calibration Lab"
     ]
 )
 
@@ -1944,6 +1945,96 @@ with tab_actual:
             )
 
 
+FEATURE_COLUMNS = [
+
+    "selected_surface_elo",
+    "overall_elo",
+    "peak_elo",
+
+    "recent_form",
+    "surface_form_60d",
+    "same_surface_ratio_60d",
+
+    "fatigue_load",
+    "minutes_30d",
+
+    "service_dominance",
+    "return_dominance",
+
+    "qualifier_momentum_raw",
+    "local_home_raw",
+
+    "value_index",
+    "credits",
+
+    "matches_in_db"
+
+]
+
+def build_feature_correlation_report(
+    training_df
+):
+
+    rows = []
+
+    for feat in FEATURE_COLUMNS:
+
+        if feat not in training_df.columns:
+            continue
+
+        try:
+
+            subset = training_df[
+                [
+                    feat,
+                    "actual_points"
+                ]
+            ].copy()
+
+            subset = subset.apply(
+                pd.to_numeric,
+                errors="coerce"
+            )
+
+            subset = subset.dropna()
+
+            if len(subset) < 10:
+                continue
+
+            corr = (
+                subset.corr()
+                .iloc[0,1]
+            )
+
+            rows.append(
+                {
+                    "feature": feat,
+                    "correlation": round(
+                        corr,
+                        4
+                    ),
+                    "abs_corr": round(
+                        abs(corr),
+                        4
+                    )
+                }
+            )
+
+        except Exception:
+            pass
+
+    if not rows:
+        return pd.DataFrame()
+
+    return (
+        pd.DataFrame(rows)
+        .sort_values(
+            "abs_corr",
+            ascending=False
+        )
+        .reset_index(drop=True)
+    )
+
 # ------------------------------------------------------------
 # TAB 4 — Backtesting
 # ------------------------------------------------------------
@@ -2398,3 +2489,98 @@ with tab_backtest:
         st.write("3. Calculate actual points using wins * 25")
         st.write("4. Compare expected points vs actual points")
         st.write("5. Calculate prediction error and efficiency ratio")
+
+# ------------------------------------------------------------
+# TAB 5 — Calibration Lab
+# ------------------------------------------------------------
+with tab_calibration:
+
+    st.subheader(
+        "Weight Calibration Lab"
+    )
+
+if (
+        "prediction_log_master_enriched"
+        not in st.session_state
+    ):
+
+        st.info(
+            "Esegui prima il Backtesting."
+        )
+
+    else:
+
+        training_df = (
+            st.session_state[
+                "prediction_log_master_enriched"
+            ]
+            .copy()
+        )
+
+training_df["actual_points"] = pd.to_numeric(
+            training_df["actual_points"],
+            errors="coerce"
+        )
+
+        training_df = training_df[
+            training_df["actual_points"]
+            .notna()
+        ].copy()
+
+c1, c2 = st.columns(2)
+
+        with c1:
+            st.metric(
+                "Training Rows",
+                len(training_df)
+            )
+
+        with c2:
+            st.metric(
+                "Unique Players",
+                training_df["player"].nunique()
+            )
+
+corr_df = (
+            build_feature_correlation_report(
+                training_df
+            )
+        )
+
+st.markdown(
+            "### Feature Correlation"
+        )
+
+        if corr_df.empty:
+
+            st.warning(
+                "Dataset troppo piccolo."
+            )
+
+        else:
+
+            st.dataframe(
+                corr_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+st.markdown(
+                "### Top Predictors"
+            )
+
+            st.dataframe(
+                corr_df.head(10),
+                use_container_width=True,
+                hide_index=True
+            )
+
+st.download_button(
+                "⬇️ Download feature_correlation.csv",
+                dataframe_to_csv_bytes(
+                    corr_df
+                ),
+                file_name="feature_correlation.csv",
+                mime="text/csv",
+                key="download_feature_correlation"
+            )
