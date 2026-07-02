@@ -135,6 +135,34 @@ PRED_KEYS = [
     "player"
 ]
 
+ACTUAL_KEYS = [
+    "tourney_name",
+    "tourney_date",
+    "winner_name",
+    "loser_name",
+    "round"
+]
+
+def merge_actual_results(
+    master_df,
+    new_df
+):
+
+    merged = pd.concat(
+        [
+            master_df,
+            new_df
+        ],
+        ignore_index=True
+    )
+
+    merged = merged.drop_duplicates(
+        subset=ACTUAL_KEYS,
+        keep="last"
+    )
+
+    return merged
+
 def get_existing_tournaments(
     master_df
 ):
@@ -2177,34 +2205,6 @@ FEATURE_COLUMNS = [
     "matches_in_db"
 
 ]
-
-ACTUAL_KEYS = [
-    "tourney_name",
-    "tourney_date",
-    "winner_name",
-    "loser_name",
-    "round"
-]
-
-def merge_actual_results(
-    master_df,
-    new_df
-):
-
-    merged = pd.concat(
-        [
-            master_df,
-            new_df
-        ],
-        ignore_index=True
-    )
-
-    merged = merged.drop_duplicates(
-        subset=ACTUAL_KEYS,
-        keep="last"
-    )
-
-    return merged
 
 def elo_to_win_probability(
     elo_value,
