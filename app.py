@@ -2921,6 +2921,34 @@ with tab_dream:
             == str(selected_run)
         ].copy()
 
+        available_players_df = (
+            run_df
+            .sort_values(
+                "actual_points",
+                ascending=False
+            )  
+            .drop_duplicates(
+                subset=["player"]
+            )
+        )
+
+        st.write(
+            "Players available:",
+            len(available_players_df)
+        )
+
+        st.dataframe(
+            available_players_df[
+                [
+                    "player",
+                    "credits",
+                    "actual_points",
+                    "strategy"
+                ]
+            ],
+            use_container_width=True
+        )
+
         budget = int(
             run_df["budget"].iloc[0]
             )
