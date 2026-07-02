@@ -127,13 +127,16 @@ def save_actual_master(df):
         index=False
     )
 
+
 PRED_KEYS = [
     "run_id",
+    "run_timestamp",
     "tournament",
     "year",
     "strategy",
     "player"
 ]
+
 
 ACTUAL_KEYS = [
     "tourney_name",
@@ -1919,6 +1922,14 @@ with tab_actual:
                             }
                         )
 
+                    if not loaded_actuals:
+
+                        st.warning(
+                        "No TennisMyLife seasons were loaded."
+                        )
+
+                        st.stop()
+                    
                     actual_df = pd.concat(
                         loaded_actuals,
                         ignore_index=True
@@ -2792,6 +2803,14 @@ with tab_calibration:
         training_df = training_df[
             training_df["actual_points"].notna()
         ].copy()
+
+        if len(training_df) == 0:
+
+            st.warning(
+                "No calibrated rows available. Run backtesting first."
+            )
+
+            st.stop()
 
         # ----------------------------
         # KPI
