@@ -1331,7 +1331,7 @@ def build_dream_team(
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
-tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration = st.tabs(
+    tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration = st.tabs(
     [
         "Predictions",
         "Prediction Warehouse",
