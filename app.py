@@ -1327,11 +1327,12 @@ def build_dream_team(
     budget=100,
     team_size=8
 ):
+    return pd.DataFrame(), 0
 
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
-    tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration = st.tabs(
+    tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration, tab_dream = st.tabs(
     [
         "Predictions",
         "Prediction Warehouse",
