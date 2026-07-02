@@ -1322,6 +1322,12 @@ def enrich_prediction_warehouse_with_actuals(
 
     return merged
 
+def build_dream_team(
+    tournament_df: pd.DataFrame,
+    budget=100,
+    team_size=8
+):
+
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
@@ -1331,7 +1337,8 @@ tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration = st.tabs(
         "Prediction Warehouse",
         "Actual Results",
         "Backtesting",
-        "🧪 Calibration Lab"
+        "🧪 Calibration Lab",
+        "🏆 Dream Team Lab"
     ]
 )
 
@@ -2863,3 +2870,93 @@ with tab_calibration:
                 mime="text/csv",
                 key="download_feature_correlation"
             )
+
+# ------------------------------------------------------------
+# TAB 6 — Dream Team Lab
+# ------------------------------------------------------------
+with tab_dream:
+
+    st.subheader("🏆 Dream Team Lab")
+
+    if "prediction_log_master_enriched" not in st.session_state:
+
+        st.info(
+            "Run Backtesting first."
+        )
+
+    else:
+
+        warehouse = (
+            st.session_state[
+                "prediction_log_master_enriched"
+            ]
+        )
+
+        st.success(
+            f"{len(warehouse)} rows available."
+        )
+
+        st.dataframe(
+            warehouse.head(50),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        run_options = (
+            warehouse["run_id"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+
+        selected_run = st.selectbox(
+            "Select Run",
+            run_options
+        )
+
+        run_df = warehouse[
+            warehouse["run_id"].astype(str)
+            == str(selected_run)
+        ].copy()
+
+        budget = int(
+            run_df["budget"].iloc[0]
+            )
+
+        team_size = int(
+                run_df["team_size"].iloc[0]
+            )
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.metric(
+        "Budget",
+        budget
+    )
+
+        with c2:
+            st.metric(
+                "Team Size",
+                team_size
+            )
+
+        required_cols = [
+            "player",
+            "credits",
+            "actual_points"
+        ]
+
+        missing_cols = [
+            c for c in required_cols
+            if c not in run_df.columns
+        ]
+
+        if missing_cols:
+
+            st.error(
+                f"Missing columns: {missing_cols}"
+            )
+
+            st.stop()
