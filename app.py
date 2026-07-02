@@ -59,6 +59,140 @@ def read_prediction_log(uploaded_file):
         uploaded_file.seek(0)
         return pd.read_csv(uploaded_file)
 
+from pathlib import Path
+
+DATA_DIR = Path("data")
+
+DATA_DIR.mkdir(exist_ok=True)
+
+PRED_MASTER_FILE = (
+    DATA_DIR / "prediction_warehouse_master.csv"
+)
+
+ACTUAL_MASTER_FILE = (
+    DATA_DIR / "actual_results_master.csv"
+)
+
+def load_prediction_master():
+
+    if PRED_MASTER_FILE.exists():
+
+        try:
+            return pd.read_csv(
+                PRED_MASTER_FILE,
+                sep=";",
+                decimal=",",
+                encoding="utf-8-sig"
+            )
+
+        except Exception:
+            pass
+
+    return pd.DataFrame()
+
+def save_prediction_master(df):
+
+    df.to_csv(
+        PRED_MASTER_FILE,
+        sep=";",
+        decimal=",",
+        encoding="utf-8-sig",
+        index=False
+    )
+
+def load_actual_master():
+
+    if ACTUAL_MASTER_FILE.exists():
+
+        try:
+            return pd.read_csv(
+                ACTUAL_MASTER_FILE,
+                sep=";",
+                decimal=",",
+                encoding="utf-8-sig"
+            )
+
+        except Exception:
+            pass
+
+    return pd.DataFrame()
+
+def save_actual_master(df):
+
+    df.to_csv(
+        ACTUAL_MASTER_FILE,
+        sep=";",
+        decimal=",",
+        encoding="utf-8-sig",
+        index=False
+    )
+
+PRED_KEYS = [
+    "run_id",
+    "tournament",
+    "year",
+    "strategy",
+    "player"
+]
+
+def get_existing_tournaments(
+    master_df
+):
+
+    if master_df.empty:
+        return []
+
+    if "tournament" not in master_df.columns:
+        return []
+
+    return sorted(
+        master_df["tournament"]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+def merge_prediction_log(
+    master_df,
+    new_df,
+    replace_tournament=False
+):
+
+    if master_df.empty:
+        return new_df.copy()
+
+    tournament = (
+        new_df["tournament"].iloc[0]
+    )
+
+    year = (
+        new_df["year"].iloc[0]
+    )
+
+    if replace_tournament:
+
+        master_df = master_df[
+            ~(
+                (master_df["tournament"] == tournament)
+                &
+                (master_df["year"] == year)
+            )
+        ].copy()
+
+    merged = pd.concat(
+        [
+            master_df,
+            new_df
+        ],
+        ignore_index=True
+    )
+
+    merged = merged.drop_duplicates(
+        subset=PRED_KEYS,
+        keep="last"
+    )
+
+    return merged
 
 def read_tennismylife_csv(uploaded_file):
     """
@@ -1285,6 +1419,65 @@ with tab_summary:
             try:
                 df = read_prediction_log(f)
 
+                master_df = load_prediction_master()
+
+                tournament_name = (
+                 df["tournament"].iloc[0]
+                )
+
+                year = (
+                 df["year"].iloc[0]
+                )
+
+                already_exists = False
+
+                if not master_df.empty:
+
+                 already_exists = len(
+                     master_df[
+                          (master_df["tournament"] == tournament_name)
+                            &
+                            (master_df["year"] == year)
+                        ]
+                    ) > 0
+
+                if already_exists:
+
+                 action = st.radio(
+                    f"{tournament_name} {year} già presente",
+                    [
+                        "Keep Existing",
+                        "Replace Existing",
+                        "Append Anyway"
+                    ],
+                  key=f"dup_{tournament_name}"
+                    )
+
+                else:
+
+                    action = "Append Anyway"
+
+                if action == "Keep Existing":
+
+                    st.info(
+                        "Master non modificato."
+                    )
+
+                else:
+
+                    master_df = merge_prediction_log(
+                        master_df,
+                        df,
+                        replace_tournament=(
+                        action == "Replace Existing"
+                        )
+                    )
+
+                    save_prediction_master(
+                        master_df
+                    )
+            
+
                 df = ensure_numeric(
                     df,
                     [
@@ -1315,12 +1508,11 @@ with tab_summary:
 
         if all_logs:
 
-            master_df = pd.concat(
-                all_logs,
-                ignore_index=True
-            )
+            master_df = load_prediction_master()
 
-            st.session_state["prediction_log_master"] = master_df
+            st.session_state[
+                "prediction_log_master"
+            ] = master_df
 
             # ----------------------------------------------------
             # KPI
@@ -1699,49 +1891,50 @@ with tab_actual:
                             }
                         )
 
-                    if loaded_actuals:
-                        actual_df = pd.concat(
-                            loaded_actuals,
-                            ignore_index=True
-                        )
+                    actual_df = pd.concat(
+                        loaded_actuals,
+                        ignore_index=True
+                    )
 
-                        st.session_state["actual_results"] = actual_df
+                    actual_master = load_actual_master()
 
-                        st.success(
+                    actual_master = merge_actual_results(
+                        actual_master,
+                        actual_df
+                    )
+
+                    save_actual_master(
+                        actual_master
+                    )
+
+                    st.session_state[
+                        "actual_results"
+                    ] = actual_master
+
+                    st.success(
                             f"{len(actual_df)} actual match rows loaded from TennisMyLife."
                         )
 
-                        st.markdown("### Load Report")
+                    st.markdown("### Load Report")
 
-                        st.dataframe(
-                            pd.DataFrame(load_report),
-                            use_container_width=True,
-                            hide_index=True
-                        )
+                    st.dataframe(
+                        pd.DataFrame(load_report),
+                        use_container_width=True,
+                        hide_index=True
+                    )
 
-                        show_dataframe_diagnostics(
-                            actual_df,
-                            "TennisMyLife Dynamic Data Diagnostics"
-                        )
+                    show_dataframe_diagnostics(
+                        actual_df,
+                        "TennisMyLife Dynamic Data Diagnostics"
+                    )
 
-                        st.markdown("### Preview")
+                    st.markdown("### Preview")
 
-                        st.dataframe(
-                            actual_df.head(50),
-                            use_container_width=True,
-                            hide_index=True
-                        )
-
-                    else:
-                        st.error(
-                            "Nessun file TennisMyLife caricato."
-                        )
-
-                        st.dataframe(
-                            pd.DataFrame(load_report),
-                            use_container_width=True,
-                            hide_index=True
-                        )
+                    st.dataframe(
+                        actual_df.head(50),
+                        use_container_width=True,
+                        hide_index=True
+                    )
 
                 except Exception as e:
                     st.error(
@@ -1765,7 +1958,20 @@ with tab_actual:
 
             actual_df = read_tennismylife_csv(actual_file)
 
-            st.session_state["actual_results"] = actual_df
+            actual_master = load_actual_master()
+
+            actual_master = merge_actual_results(
+                actual_master,
+                actual_df
+            )
+
+            save_actual_master(
+                actual_master
+            )
+
+            st.session_state[
+                "actual_results"
+            ] = actual_master
 
             st.success(
                 f"{len(actual_df)} match rows loaded."
@@ -1971,6 +2177,34 @@ FEATURE_COLUMNS = [
     "matches_in_db"
 
 ]
+
+ACTUAL_KEYS = [
+    "tourney_name",
+    "tourney_date",
+    "winner_name",
+    "loser_name",
+    "round"
+]
+
+def merge_actual_results(
+    master_df,
+    new_df
+):
+
+    merged = pd.concat(
+        [
+            master_df,
+            new_df
+        ],
+        ignore_index=True
+    )
+
+    merged = merged.drop_duplicates(
+        subset=ACTUAL_KEYS,
+        keep="last"
+    )
+
+    return merged
 
 def elo_to_win_probability(
     elo_value,
