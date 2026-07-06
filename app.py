@@ -1466,7 +1466,19 @@ with tab_summary:
             try:
                 df = read_prediction_log(f)
 
+                df["player_norm"] = (
+                    df["player"]
+                    .apply(normalize_player_name)
+                )
+
                 master_df = load_prediction_master()
+
+                if not master_df.empty and "player_norm" not in master_df.columns:
+
+                    master_df["player_norm"] = (
+                        master_df["player"]
+                        .apply(normalize_player_name)
+                    )
 
                 tournament_name = (
                  df["tournament"].iloc[0]
