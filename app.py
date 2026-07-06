@@ -2946,14 +2946,30 @@ with tab_dream:
             == str(selected_run)
         ].copy()
 
+        st.write("Rows in run:", len(run_df))
+
+        st.write(
+            run_df[
+                ["player","strategy"]
+            ]
+            .sort_values(
+                ["player","strategy"]
+            )       
+        )
+
+        run_df["player_norm"] = (
+            run_df["player"]
+            .apply(normalize_player_name)
+            )
+
         available_players_df = (
             run_df
             .sort_values(
-                "actual_points",
+                "expected_points",
                 ascending=False
-            )  
+            )
             .drop_duplicates(
-                subset=["player"]
+                subset=["player_norm"]
             )
         )
 
