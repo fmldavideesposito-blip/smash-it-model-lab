@@ -2941,10 +2941,29 @@ with tab_dream:
             run_options
         )
 
+        strategy_filter = st.selectbox(
+            "Strategy",
+            [
+                "All Strategies",
+                "1. Optimized Team",
+                "2. Aggressive Alternative",
+                "3. Conservative Alternative"
+            ],
+            key="dream_strategy_filter"
+        )
+
+
         run_df = warehouse[
             warehouse["run_id"].astype(str)
             == str(selected_run)
         ].copy()
+
+        if strategy_filter != "All Strategies":
+
+            run_df = run_df[
+                run_df["strategy"]
+                == strategy_filter
+            ].copy()
 
         st.write("Rows in run:", len(run_df))
 
