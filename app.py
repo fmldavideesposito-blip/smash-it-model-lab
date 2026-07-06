@@ -65,7 +65,7 @@ st.write(
 )
 
 test_df = load_csv_from_github(
-    "data/prediction_warehouse_master.csv"
+    "predictions/prediction_warehouse (2).csv"
 )
 
 st.write(
