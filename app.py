@@ -1524,6 +1524,56 @@ with tab_summary:
         key="prediction_warehouse"
     )
 
+    # ----------------------------------------------------
+    # Visualizza warehouse già esistente
+    # ----------------------------------------------------
+    if (
+        "prediction_log_master" in st.session_state
+        and uploaded_logs is None
+    ):
+
+        master_df = st.session_state[
+            "prediction_log_master"
+        ]
+
+        st.success(
+            f"{len(master_df)} rows loaded from GitHub."
+        )
+
+        run_count = (
+            master_df["run_id"].nunique()
+            if "run_id" in master_df.columns
+            else 0
+        )
+
+        tournament_count = (
+            master_df["tournament"].nunique()
+            if "tournament" in master_df.columns
+            else 0
+        )
+
+        strategy_count = (
+            master_df["strategy"].nunique()
+            if "strategy" in master_df.columns
+            else 0
+        )
+
+        rows_count = len(master_df)
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            st.metric("Prediction Runs", run_count)
+
+        with c2:
+            st.metric("Tournaments", tournament_count)
+
+        with c3:
+            st.metric("Strategies", strategy_count)
+
+        with c4:
+            st.metric("Rows", rows_count)
+
     if uploaded_logs:
 
         all_logs = []
