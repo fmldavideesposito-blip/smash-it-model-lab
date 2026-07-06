@@ -1,4 +1,5 @@
 import io
+import base64
 import requests
 import pandas as pd
 import streamlit as st
@@ -16,6 +17,23 @@ st.set_page_config(
 st.title("🎾 Smash IT Model Lab")
 st.caption("Prediction Backtesting & Model Calibration")
 
+st.success("GitHub Secrets Loaded")
+
+st.write(
+    "Owner:",
+    GITHUB_OWNER
+)
+
+st.write(
+    "Repo:",
+    GITHUB_REPO
+)
+
+st.write(
+    "Token presente:",
+    len(GITHUB_TOKEN) > 20
+)
+
 
 # ------------------------------------------------------------
 # Costanti TennisMyLife
@@ -23,6 +41,12 @@ st.caption("Prediction Backtesting & Model Calibration")
 TML_DATA_FILES_API = "https://stats.tennismylife.org/api/data-files"
 POINTS_PER_WIN = 25
 
+TML_DATA_FILES_API = "https://stats.tennismylife.org/api/data-files"
+POINTS_PER_WIN = 25
+
+GITHUB_OWNER = st.secrets["GITHUB_OWNER"]
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 
 # ------------------------------------------------------------
 # Utility CSV
