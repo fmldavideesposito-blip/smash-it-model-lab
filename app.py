@@ -5,6 +5,10 @@ import pandas as pd
 import streamlit as st
 
 
+GITHUB_OWNER = st.secrets["GITHUB_OWNER"]
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+
 # ------------------------------------------------------------
 # Config pagina
 # ------------------------------------------------------------
@@ -40,13 +44,6 @@ st.write(
 # ------------------------------------------------------------
 TML_DATA_FILES_API = "https://stats.tennismylife.org/api/data-files"
 POINTS_PER_WIN = 25
-
-TML_DATA_FILES_API = "https://stats.tennismylife.org/api/data-files"
-POINTS_PER_WIN = 25
-
-GITHUB_OWNER = st.secrets["GITHUB_OWNER"]
-GITHUB_REPO = st.secrets["GITHUB_REPO"]
-GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 
 # ------------------------------------------------------------
 # Utility CSV
