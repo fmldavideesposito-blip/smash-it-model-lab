@@ -1450,6 +1450,19 @@ with tab_summary:
         "Carica più prediction log scaricati dallo Smash IT Optimizer per creare uno storico centralizzato."
     )
 
+    # ----------------------------------------------------
+    # Auto-load warehouse persistente
+    # ----------------------------------------------------
+    if "prediction_log_master" not in st.session_state:
+
+        master_df = load_prediction_master()
+
+        if not master_df.empty:
+
+            st.session_state[
+                "prediction_log_master"
+            ] = master_df
+    
     uploaded_logs = st.file_uploader(
         "Upload one or more prediction logs",
         type=["csv"],
@@ -1841,6 +1854,20 @@ with tab_summary:
 # ------------------------------------------------------------
 # TAB 3 — Actual Results
 # ------------------------------------------------------------
+
+# ----------------------------------------------------
+# Auto-load actual results persistenti
+# ----------------------------------------------------
+if "actual_results" not in st.session_state:
+
+    actual_master = load_actual_master()
+
+    if not actual_master.empty:
+
+        st.session_state[
+            "actual_results"
+        ] = actual_master
+
 with tab_actual:
 
     st.subheader("Actual Results")
