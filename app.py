@@ -9,6 +9,32 @@ GITHUB_OWNER = st.secrets["GITHUB_OWNER"]
 GITHUB_REPO = st.secrets["GITHUB_REPO"]
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 
+def load_csv_from_github(path):
+
+    try:
+
+        url = (
+            f"https://raw.githubusercontent.com/"
+            f"{GITHUB_OWNER}/"
+            f"{GITHUB_REPO}/main/"
+            f"{path}"
+        )
+
+        return pd.read_csv(
+            url,
+            sep=";",
+            decimal=",",
+            encoding="utf-8-sig"
+        )
+
+    except Exception as e:
+
+        st.warning(
+            f"Unable to load {path} from GitHub"
+        )
+
+        return pd.DataFrame()
+
 # ------------------------------------------------------------
 # Config pagina
 # ------------------------------------------------------------
@@ -38,6 +64,14 @@ st.write(
     len(GITHUB_TOKEN) > 20
 )
 
+test_df = load_csv_from_github(
+    "data/prediction_warehouse_master.csv"
+)
+
+st.write(
+    "Rows in GitHub warehouse:",
+    len(test_df)
+)
 
 # ------------------------------------------------------------
 # Costanti TennisMyLife
