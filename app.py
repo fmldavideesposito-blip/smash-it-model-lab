@@ -130,20 +130,19 @@ ACTUAL_MASTER_FILE = (
 
 def load_prediction_master():
 
-    if PRED_MASTER_FILE.exists():
+    try:
 
-        try:
-            return pd.read_csv(
-                PRED_MASTER_FILE,
-                sep=";",
-                decimal=",",
-                encoding="utf-8-sig"
-            )
+        return load_csv_from_github(
+            "data/prediction_warehouse_master.csv"
+        )
 
-        except Exception:
-            pass
+    except Exception as e:
 
-    return pd.DataFrame()
+        st.error(
+            f"Errore caricamento warehouse GitHub: {e}"
+        )
+
+        return pd.DataFrame()
 
 def save_prediction_master(df):
 
