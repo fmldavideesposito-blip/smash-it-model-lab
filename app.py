@@ -134,7 +134,7 @@ PRED_KEYS = [
     "tournament",
     "year",
     "strategy",
-    "player"
+    "player_norm"
 ]
 
 
@@ -542,13 +542,21 @@ def build_prediction_vs_actual_global(
     if actual_wins.empty:
         return pd.DataFrame()
 
+    pred_norm = pred_df.copy()
+
+    pred_norm["player_norm"] = (
+    pred_norm["player"]
+        .apply(normalize_player_name)
+    )
+
     prediction_summary = (
-        pred_df
+        pred_norm
         .groupby(
-            ["player"],
-            dropna=False
+            ["player_norm"],
+           dropna=False
         )
         .agg(
+            player=("player", "first"),
             expected_points=("expected_points", "sum"),
             selections=("player", "count")
         )
