@@ -2845,6 +2845,11 @@ with tab_calibration:
                 training_df["player"].nunique()
             )
 
+        training_df = training_df[
+            training_df["strategy"]
+            == "1. Optimized Team"
+        ].copy()
+
         # ----------------------------
         # Correlation
         # ----------------------------
