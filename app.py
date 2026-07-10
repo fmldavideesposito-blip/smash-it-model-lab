@@ -888,7 +888,7 @@ def build_predicted_players_actual_match(
                     "found_in_actuals": False,
                     "wins": 0,
                     "actual_points": 0,
-                    "tournaments_won_matches": "",
+                    "tournaments_won_matches": 0,
                     "surfaces": "",
                     "rounds_won": "",
                 }
@@ -900,6 +900,11 @@ def build_predicted_players_actual_match(
         match_df["found_in_actuals"] == False
     ].copy()
 
+    match_df["tournaments_won_matches"] = pd.to_numeric(
+        match_df["tournaments_won_matches"],
+        errors="coerce"
+    ).fillna(0).astype(int)
+    
     return match_df, unmatched_df
 
 # ------------------------------------------------------------
