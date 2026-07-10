@@ -82,6 +82,60 @@ POINTS_PER_WIN = 25
 # ------------------------------------------------------------
 # Utility CSV
 # ------------------------------------------------------------
+
+def upload_csv_to_github(
+    df,
+    path,
+    commit_message
+):
+
+    csv_content = df.to_csv(
+        sep=";",
+        decimal=",",
+        encoding="utf-8-sig",
+        index=False
+    )
+
+    api_url = (
+        f"https://api.github.com/repos/"
+        f"{GITHUB_OWNER}/"
+        f"{GITHUB_REPO}/contents/"
+        f"{path}"
+    )
+
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    sha = None
+
+    existing = requests.get(
+        api_url,
+        headers=headers
+    )
+
+    if existing.status_code == 200:
+        sha = existing.json()["sha"]
+
+    payload = {
+        "message": commit_message,
+        "content": base64.b64encode(
+            csv_content.encode("utf-8-sig")
+        ).decode("utf-8")
+    }
+
+    if sha:
+        payload["sha"] = sha
+
+    response = requests.put(
+        api_url,
+        headers=headers,
+        json=payload
+    )
+
+    response.raise_for_status()
+
 def read_prediction_log(uploaded_file):
     """
     Legge il prediction_log.csv generato da Smash IT Optimizer.
@@ -146,12 +200,13 @@ def load_prediction_master():
 
 def save_prediction_master(df):
 
-    df.to_csv(
-        PRED_MASTER_FILE,
-        sep=";",
-        decimal=",",
-        encoding="utf-8-sig",
-        index=False
+    upload_csv_to_github(
+        df=df,
+        path="data/prediction_warehouse_master.csv",
+        commit_message=(
+            f"Update Warehouse "
+            f"{pd.Timestamp.now()}"
+        )
     )
 
 def load_actual_master():
@@ -1657,7 +1712,11 @@ with tab_summary:
                     save_prediction_master(
                         master_df
                     )
-            
+
+                    st.success(
+                        f"Warehouse salvato su GitHub "
+                        f"({len(master_df)} rows)"
+                    )    
 
                 df = ensure_numeric(
                     df,
