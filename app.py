@@ -134,6 +134,16 @@ def upload_csv_to_github(
         json=payload
     )
 
+    st.write(
+        "Uploading to GitHub:",
+        path
+    )
+
+    st.write(
+        "GitHub status:",
+        response.status_code
+    )
+    
     response.raise_for_status()
 
 def read_prediction_log(uploaded_file):
@@ -1741,10 +1751,13 @@ with tab_summary:
 
                 all_logs.append(df)
 
-            except Exception:
-                st.warning(
-                    f"Unable to load {f.name}"
+            except Exception as e:
+
+                st.error(
+                    f"Errore caricamento {f.name}"
                 )
+
+                st.exception(e)
 
         if all_logs:
 
