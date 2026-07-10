@@ -2581,6 +2581,32 @@ with tab_backtest:
         # ----------------------------------------------------
         st.markdown("### Tournament Mapping")
 
+        with st.expander("DEBUG Tournament Names"):
+
+        st.write("Prediction tournaments:")
+
+        st.write(
+            sorted(
+                pred_df["tournament"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+        )
+
+        st.write("Actual tournaments:")
+
+        st.write(
+            sorted(
+                actual_df["tourney_name"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+        )
+
         mapping_df = build_tournament_mapping(
             pred_df,
             actual_df
