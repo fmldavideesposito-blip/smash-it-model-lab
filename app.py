@@ -48,7 +48,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🎾 Smash IT Model Lab")
+st.title("🎾 Smash IT Model Lab by Davide Esposito")
 st.caption("Prediction Backtesting & Model Calibration")
 
 st.success("GitHub Secrets Loaded")
