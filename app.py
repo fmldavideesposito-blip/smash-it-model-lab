@@ -1,6 +1,8 @@
 import io
 import base64
 import requests
+import re
+import unicodedata
 import pandas as pd
 import streamlit as st
 
@@ -767,30 +769,184 @@ def filter_actuals_by_tournament(
 # ------------------------------------------------------------
 # Tournament Mapping
 # ------------------------------------------------------------
-def normalize_tournament_name(name):
+
+def normalize_text_key(value):
     """
-    Normalizza il nome torneo per confronti robusti.
+    Crea una chiave robusta:
+    - minuscolo
+    - rimozione accenti
+    - rimozione apostrofi, trattini, spazi, simboli
     """
 
-    if pd.isna(name):
+    if pd.isna(value):
         return ""
 
-    name = str(name).lower().strip()
+    text = str(value).strip().lower()
 
-    replacements = {
-        "roland garros": "rolandgarros",
-        "french open": "rolandgarros",
-        "rome": "roma",
-        "rome masters": "roma",
-        "internazionali bnl d'italia": "roma",
-        "madrid masters": "madrid",
-    }
-
-    return replacements.get(
-        name,
-        name.replace(" ", "")
+    text = unicodedata.normalize(
+        "NFKD",
+        text
+    ).encode(
+        "ascii",
+        "ignore"
+    ).decode(
+        "ascii"
     )
 
+    text = text.replace("&", "and")
+
+    text = re.sub(
+        r"[^a-z0-9]+",
+        "",
+        text
+    )
+
+    return text
+
+
+TOURNAMENT_CANONICAL_MAP = {
+    # --------------------------------------------------------
+    # Slam
+    # --------------------------------------------------------
+    "australianopen": "australianopen",
+    "rolandgarros": "rolandgarros",
+    "frenchopen": "rolandgarros",
+    "wimbledon": "wimbledon",
+    "usopen": "usopen",
+
+    # --------------------------------------------------------
+    # Masters 1000
+    # --------------------------------------------------------
+    "indianwells": "indianwells",
+    "indianwellsmasters": "indianwells",
+
+    "miami": "miami",
+    "miamimasters": "miami",
+
+    "montecarlo": "montecarlo",
+    "montecarlomasters": "montecarlo",
+
+    "madrid": "madrid",
+    "madridmasters": "madrid",
+
+    "roma": "rome",
+    "rome": "rome",
+    "romemasters": "rome",
+    "internazionalibnlditalia": "rome",
+
+    "cincinnati": "cincinnati",
+    "cincinnatimasters": "cincinnati",
+
+    "shanghai": "shanghai",
+    "shanghaimasters": "shanghai",
+
+    "parigibercy": "paris",
+    "paris": "paris",
+    "parismasters": "paris",
+
+    "torontomontreal": "canada",
+    "toronto": "canada",
+    "torontomasters": "canada",
+    "montreal": "canada",
+    "montrealmasters": "canada",
+    "canadianmasters": "canada",
+
+    # --------------------------------------------------------
+    # ATP Finals
+    # --------------------------------------------------------
+    "nittoatpfinals": "atpfinals",
+    "atpfinals": "atpfinals",
+    "tourfinals": "atpfinals",
+
+    # --------------------------------------------------------
+    # ATP 500 / 250 - nomi italiani vs TennisMyLife
+    # --------------------------------------------------------
+    "amburgo": "hamburg",
+    "hamburg": "hamburg",
+
+    "barcellona": "barcelona",
+    "barcelona": "barcelona",
+
+    "basilea": "basel",
+    "basel": "basel",
+
+    "ginevra": "geneva",
+    "geneva": "geneva",
+
+    "lione": "lyon",
+    "lyon": "lyon",
+
+    "monaco": "munich",
+    "munich": "munich",
+
+    "pechino": "beijing",
+    "beijing": "beijing",
+
+    "stoccolma": "stockholm",
+    "stockholm": "stockholm",
+
+    "queens": "queens",
+    "queensclub": "queens",
+    "london": "queens",
+
+    "shertogenbosch": "hertogenbosch",
+    "hertogenbosch": "hertogenbosch",
+    "sherogenbosch": "hertogenbosch",
+
+    # --------------------------------------------------------
+    # Tornei che normalmente coincidono già
+    # --------------------------------------------------------
+    "acapulco": "acapulco",
+    "adelaide": "adelaide",
+    "almaty": "almaty",
+    "auckland": "auckland",
+    "bastad": "bastad",
+    "brisbane": "brisbane",
+    "bruxelles": "brussels",
+    "brussels": "brussels",
+    "bucharest": "bucharest",
+    "buenosaires": "buenosaires",
+    "chengdu": "chengdu",
+    "dallas": "dallas",
+    "delraybeach": "delraybeach",
+    "doha": "doha",
+    "dubai": "dubai",
+    "eastbourne": "eastbourne",
+    "estoril": "estoril",
+    "gstaad": "gstaad",
+    "halle": "halle",
+    "hangzhou": "hangzhou",
+    "hongkong": "hongkong",
+    "houston": "houston",
+    "kitzbuhel": "kitzbuhel",
+    "loscabos": "loscabos",
+    "mallorca": "mallorca",
+    "marrakech": "marrakech",
+    "montpellier": "montpellier",
+    "riodejaneiro": "riodejaneiro",
+    "rotterdam": "rotterdam",
+    "santiago": "santiago",
+    "stuttgart": "stuttgart",
+    "tokyo": "tokyo",
+    "umag": "umag",
+    "vienna": "vienna",
+    "washington": "washington",
+    "winstonsalem": "winstonsalem",
+}
+
+
+def normalize_tournament_name(name):
+    """
+    Normalizza il nome torneo usando una chiave canonica comune
+    tra Optimizer e TennisMyLife.
+    """
+
+    key = normalize_text_key(name)
+
+    return TOURNAMENT_CANONICAL_MAP.get(
+        key,
+        key
+    )
 
 def build_tournament_mapping(pred_df, actual_df):
     """
