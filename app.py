@@ -33,6 +33,8 @@ def load_csv_from_github(path):
             f"Unable to load {path} from GitHub"
         )
 
+        st.exception(e)
+
         return pd.DataFrame()
 
 # ------------------------------------------------------------
@@ -132,6 +134,11 @@ def upload_csv_to_github(
         api_url,
         headers=headers,
         json=payload
+    )
+
+    st.write(
+        "GitHub response:",
+        response.text
     )
 
     st.write(
