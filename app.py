@@ -135,21 +135,6 @@ def upload_csv_to_github(
         headers=headers,
         json=payload
     )
-
-    st.write(
-        "GitHub response:",
-        response.text
-    )
-
-    st.write(
-        "Uploading to GitHub:",
-        path
-    )
-
-    st.write(
-        "GitHub status:",
-        response.status_code
-    )
     
     response.raise_for_status()
 
