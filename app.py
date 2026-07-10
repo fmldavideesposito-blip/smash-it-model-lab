@@ -43,7 +43,7 @@ def load_csv_from_github(path):
 # Config pagina
 # ------------------------------------------------------------
 st.set_page_config(
-    page_title="Smash IT Model Lab",
+    page_title="Smash IT Model Lab by Davide Esposito",
     page_icon="🎾",
     layout="wide"
 )
