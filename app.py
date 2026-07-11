@@ -1924,14 +1924,26 @@ with tab_summary:
             master_df
         )
 
+        st.write(
+            "TORNEI MASTER IN MEMORIA:"
+            )
+
+        st.write(
+            sorted(
+                master_df["tournament"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+        )
+
         st.success(
             f"Warehouse salvato su GitHub "
             f"({len(master_df)} rows)"
         )
         
         if all_logs:
-
-            master_df = load_prediction_master()
 
             st.session_state[
                 "prediction_log_master"
