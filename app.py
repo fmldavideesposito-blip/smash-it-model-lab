@@ -1810,24 +1810,32 @@ with tab_summary:
 
         all_logs = []
 
+        master_df = load_prediction_master()
+
+        if (
+            not master_df.empty
+            and "player_norm" not in master_df.columns
+        ):
+            master_df["player_norm"] = (
+                master_df["player"]
+                .apply(normalize_player_name)
+            )
         for f in uploaded_logs:
 
             try:
                 df = read_prediction_log(f)
 
+                st.write(
+                    "FILE:",
+                    f.name,
+                    "TOURNAMENT:",
+                    df["tournament"].iloc[0]
+                )
+
                 df["player_norm"] = (
                     df["player"]
                     .apply(normalize_player_name)
                 )
-
-                master_df = load_prediction_master()
-
-                if not master_df.empty and "player_norm" not in master_df.columns:
-
-                    master_df["player_norm"] = (
-                        master_df["player"]
-                        .apply(normalize_player_name)
-                    )
 
                 tournament_name = (
                  df["tournament"].iloc[0]
@@ -1881,15 +1889,6 @@ with tab_summary:
                         )
                     )
 
-                    save_prediction_master(
-                        master_df
-                    )
-
-                    st.success(
-                        f"Warehouse salvato su GitHub "
-                        f"({len(master_df)} rows)"
-                    )    
-
                 df = ensure_numeric(
                     df,
                     [
@@ -1921,6 +1920,15 @@ with tab_summary:
 
                 st.exception(e)
 
+        save_prediction_master(
+            master_df
+        )
+
+        st.success(
+            f"Warehouse salvato su GitHub "
+            f"({len(master_df)} rows)"
+        )
+        
         if all_logs:
 
             master_df = load_prediction_master()
