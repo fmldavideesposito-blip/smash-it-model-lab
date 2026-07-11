@@ -1754,6 +1754,20 @@ with tab_summary:
             "prediction_log_master"
         ]
 
+        with st.expander("DEBUG Warehouse Tournaments"):
+
+            st.write(
+                sorted(
+                    master_df["tournament"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+            )
+
+        
+
         st.success(
             f"{len(master_df)} rows loaded from GitHub."
         )
