@@ -2665,7 +2665,7 @@ FEATURE_COLUMNS = [
     "credits",
 
     "matches_in_db",
-    "expected_points"
+    "expected_points",
 
 ]
 
