@@ -1437,13 +1437,11 @@ def enrich_prediction_warehouse_with_actuals(
     Arricchisce il Prediction Warehouse con gli actual calcolati
     da build_prediction_vs_actual_tournament().
 
-    Riempie:
-    - actual_points
-    - actual_wins
-    - actual_matches_played
-    - actual_best_round
-    - prediction_error
-    - efficiency_ratio
+    Importante:
+    - sovrascrive gli actual precedenti quando il backtesting produce un valore;
+    - mantiene actual_points = 0 quando il giocatore ha davvero perso senza vittorie;
+    - aggiunge actual_matches_in_tournament per distinguere tornei completati
+      da tornei non ancora presenti negli actual TennisMyLife.
     """
 
     if pred_df is None or pred_df.empty:
@@ -1497,7 +1495,9 @@ def enrich_prediction_warehouse_with_actuals(
         c for c in [
             "actual_points",
             "actual_wins",
+            "actual_losses",
             "actual_matches_played",
+            "actual_matches_in_tournament",
             "prediction_error",
             "efficiency_ratio",
             "rounds_won"
@@ -1508,12 +1508,30 @@ def enrich_prediction_warehouse_with_actuals(
     if not detail_cols:
         return warehouse
 
+    numeric_detail_cols = [
+        "actual_points",
+        "actual_wins",
+        "actual_losses",
+        "actual_matches_played",
+        "actual_matches_in_tournament",
+        "prediction_error",
+        "efficiency_ratio"
+    ]
+
+    for col in numeric_detail_cols:
+        if col in detail.columns:
+            detail[col] = pd.to_numeric(
+                detail[col],
+                errors="coerce"
+            )
+
     detail_small = (
         detail[
             merge_keys + detail_cols
         ]
         .drop_duplicates(
-            subset=merge_keys
+            subset=merge_keys,
+            keep="last"
         )
         .copy()
     )
@@ -1526,9 +1544,9 @@ def enrich_prediction_warehouse_with_actuals(
     )
 
     # --------------------------------------------------------
-    # Helper: riempie le colonne vuote originali con i valori _bt
+    # Helper: sovrascrive con il valore da backtesting
     # --------------------------------------------------------
-    def fill_from_backtest(target_col, source_col):
+    def overwrite_from_backtest(target_col, source_col):
 
         if source_col not in merged.columns:
             return
@@ -1536,28 +1554,23 @@ def enrich_prediction_warehouse_with_actuals(
         if target_col not in merged.columns:
             merged[target_col] = pd.NA
 
-        merged[target_col] = (
-            merged[target_col]
-            .replace(
-                {
-                    "": pd.NA,
-                    "None": pd.NA,
-                    "none": pd.NA,
-                    "nan": pd.NA,
-                    "NaN": pd.NA
-                }
-            )
-        )
+        mask = merged[source_col].notna()
 
-        merged[target_col] = merged[target_col].combine_first(
-            merged[source_col]
-        )
+        merged.loc[
+            mask,
+            target_col
+        ] = merged.loc[
+            mask,
+            source_col
+        ]
 
-    fill_from_backtest("actual_points", "actual_points_bt")
-    fill_from_backtest("actual_wins", "actual_wins_bt")
-    fill_from_backtest("actual_matches_played", "actual_matches_played_bt")
-    fill_from_backtest("prediction_error", "prediction_error_bt")
-    fill_from_backtest("efficiency_ratio", "efficiency_ratio_bt")
+    overwrite_from_backtest("actual_points", "actual_points_bt")
+    overwrite_from_backtest("actual_wins", "actual_wins_bt")
+    overwrite_from_backtest("actual_losses", "actual_losses_bt")
+    overwrite_from_backtest("actual_matches_played", "actual_matches_played_bt")
+    overwrite_from_backtest("actual_matches_in_tournament", "actual_matches_in_tournament_bt")
+    overwrite_from_backtest("prediction_error", "prediction_error_bt")
+    overwrite_from_backtest("efficiency_ratio", "efficiency_ratio_bt")
 
     # --------------------------------------------------------
     # actual_best_round deriva da rounds_won
@@ -1567,25 +1580,45 @@ def enrich_prediction_warehouse_with_actuals(
         if "actual_best_round" not in merged.columns:
             merged["actual_best_round"] = pd.NA
 
-        merged["actual_best_round"] = (
-            merged["actual_best_round"]
-            .replace(
-                {
-                    "": pd.NA,
-                    "None": pd.NA,
-                    "none": pd.NA,
-                    "nan": pd.NA,
-                    "NaN": pd.NA
-                }
+        rounds_mask = (
+            merged["rounds_won"]
+            .notna()
+            &
+            (
+                merged["rounds_won"]
+                .astype(str)
+                .str.strip()
+                != ""
             )
         )
 
-        merged["actual_best_round"] = (
-            merged["actual_best_round"]
-            .combine_first(
-                merged["rounds_won"]
+        merged.loc[
+            rounds_mask,
+            "actual_best_round"
+        ] = merged.loc[
+            rounds_mask,
+            "rounds_won"
+        ]
+
+    # --------------------------------------------------------
+    # Pulizia numerica finale
+    # --------------------------------------------------------
+    numeric_cols = [
+        "actual_points",
+        "actual_wins",
+        "actual_losses",
+        "actual_matches_played",
+        "actual_matches_in_tournament",
+        "prediction_error",
+        "efficiency_ratio"
+    ]
+
+    for col in numeric_cols:
+        if col in merged.columns:
+            merged[col] = pd.to_numeric(
+                merged[col],
+                errors="coerce"
             )
-        )
 
     # --------------------------------------------------------
     # Rimuove colonne tecniche duplicate
@@ -2631,7 +2664,8 @@ FEATURE_COLUMNS = [
     "value_index",
     "credits",
 
-    "matches_in_db"
+    "matches_in_db",
+    "expected_points"
 
 ]
 
@@ -3224,21 +3258,38 @@ with tab_calibration:
             .copy()
         )
 
-        if "selected_surface_elo" in training_df.columns:
-
-            training_df["elo_win_probability"] = (
-                training_df["selected_surface_elo"]
-                .apply(
-                    lambda x: elo_to_win_probability(
-                     x,
-                        reference_elo=2000
-                 )
-             )
-            )
-
         # ----------------------------
         # Clean dataset
         # ----------------------------
+        if "actual_matches_in_tournament" in training_df.columns:
+
+            training_df["actual_matches_in_tournament"] = pd.to_numeric(
+                training_df["actual_matches_in_tournament"],
+                errors="coerce"
+            ).fillna(0)
+
+            training_df = training_df[
+                training_df["actual_matches_in_tournament"] > 0
+            ].copy()
+
+        else:
+
+            st.warning(
+                "La colonna actual_matches_in_tournament non è disponibile. "
+                "Esegui prima il Backtesting con la nuova funzione di enrichment."
+            )
+
+            st.stop()
+
+        if "actual_points" not in training_df.columns:
+
+            st.warning(
+                "La colonna actual_points non è disponibile. "
+                "Esegui prima il Backtesting."
+            )
+
+            st.stop()
+
         training_df["actual_points"] = pd.to_numeric(
             training_df["actual_points"],
             errors="coerce"
@@ -3247,6 +3298,18 @@ with tab_calibration:
         training_df = training_df[
             training_df["actual_points"].notna()
         ].copy()
+
+        if "selected_surface_elo" in training_df.columns:
+
+            training_df["elo_win_probability"] = (
+                training_df["selected_surface_elo"]
+                .apply(
+                    lambda x: elo_to_win_probability(
+                        x,
+                        reference_elo=2000
+                    )
+                )
+            )
 
         if len(training_df) == 0:
 
@@ -3257,26 +3320,79 @@ with tab_calibration:
             st.stop()
 
         # ----------------------------
-        # KPI
+        # KPI before strategy filter
         # ----------------------------
         c1, c2 = st.columns(2)
 
         with c1:
             st.metric(
-                "Training Rows",
+                "Training Rows before strategy filter",
                 len(training_df)
             )
 
         with c2:
             st.metric(
-                "Unique Players",
+                "Unique Players before strategy filter",
                 training_df["player"].nunique()
+                if "player" in training_df.columns
+                else 0
             )
 
-        training_df = training_df[
-            training_df["strategy"]
-            == "1. Optimized Team"
-        ].copy()
+        if "tournament" in training_df.columns:
+
+            completed_tournaments = (
+                training_df["tournament"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+
+            st.caption(
+                "Tournaments included in calibration: "
+                + ", ".join(sorted(completed_tournaments))
+            )
+
+        # ----------------------------
+        # Strategy filter
+        # ----------------------------
+        if "strategy" in training_df.columns:
+
+            training_df = training_df[
+                training_df["strategy"]
+                == "1. Optimized Team"
+            ].copy()
+
+            st.caption(
+                "Calibration is currently based only on: 1. Optimized Team"
+            )
+
+        if len(training_df) == 0:
+
+            st.warning(
+                "No rows available after strategy filter."
+            )
+
+            st.stop()
+
+        # ----------------------------
+        # KPI after strategy filter
+        # ----------------------------
+        c3, c4 = st.columns(2)
+
+        with c3:
+            st.metric(
+                "Training Rows after strategy filter",
+                len(training_df)
+            )
+
+        with c4:
+            st.metric(
+                "Unique Players after strategy filter",
+                training_df["player"].nunique()
+                if "player" in training_df.columns
+                else 0
+            )
 
         # ----------------------------
         # Correlation
