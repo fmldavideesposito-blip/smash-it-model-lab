@@ -3979,13 +3979,44 @@ with tab_ideal:
         # ----------------------------------------------------
         # Build ideal pool from ranking_completo.csv
         # ----------------------------------------------------
+        base_cols = [
+            "Player",
+            "Smash IT Credits CW N",
+            "expected_points_v13",
+            "rank_v13"
+        ]
+
+        feature_cols = [
+            "seed",
+            "entry",
+            "ioc",
+            "real_draw_size",
+            "draw_size",
+            "bracket_size",
+            "r1_match",
+            "overall_elo",
+            "selected_surface_elo",
+            "peak_elo",
+            "recent_form",
+            "surface_form_60d",
+            "same_surface_ratio_60d",
+            "fatigue_load",
+            "minutes_30d",
+            "service_dominance",
+            "return_dominance",
+            "qualifier_momentum_raw",
+            "local_home_raw",
+            "value_index",
+            "matches_in_db"
+        ]
+
+        available_cols = [
+            c for c in base_cols + feature_cols
+            if c in ranking_df.columns
+        ]
+
         ideal_pool = ranking_df[
-            [
-                "Player",
-                "Smash IT Credits CW N",
-                "expected_points_v13",
-                "rank_v13"
-            ]
+            available_cols
         ].copy()
 
         ideal_pool = ideal_pool.rename(
