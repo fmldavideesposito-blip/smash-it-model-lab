@@ -1,4 +1,4 @@
 ﻿run_id;tournament;year;budget;team_size;expected_team_actual_points;true_ideal_points;gap_vs_true_ideal;capture_rate_pct;expected_team_credits;true_ideal_credits;overlap_players;overlap_count
 2026_Eastbourne_20260626_061912;Eastbourne;2026;50;6;200,0;450,0;250,0;44,4;20,3;18,5;JACK DRAPER, UGO HUMBERT;2
 2026_Wimbledon_20260629_112643;Wimbledon;2026;110;8;400,0;925,0;525,0;43,2;108,5;108,4;Jannik Sinner;1
-2026_Roma_20260625_110538;Roma;2026;80;8;475,0;750,0;275,0;63,3;80,0;79,1;CASPER RUUD, DINO PRIZMIC, RAFAEL JODAR;3
+2026_Roma_20260625_110538;Roma;2026;80;8;275,0;425,0;150,0;64,7;44,0;45,8;Alejandro Tabilo, Alexander Blockx, Andrey Rublev, Luciano Darderi, Nuno Borges;5
