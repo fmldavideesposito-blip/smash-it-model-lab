@@ -3695,6 +3695,13 @@ with tab_ideal:
             errors="coerce"
         )
 
+        ideal_pool = ideal_pool.dropna(
+            subset=[
+                "credits",
+                "expected_points"
+            ]
+        ).copy()
+
         ranking_df = ranking_df.sort_values(
             "rank_v13"
         )
@@ -3723,4 +3730,41 @@ with tab_ideal:
             ideal_pool.head(20),
             use_container_width=True,
             hide_index=True
+        )
+
+        budget = 100
+        team_size = 8
+
+        st.markdown(
+            "### Optimization Parameters"
+        )
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.metric(
+                "Budget",
+                budget
+            )
+
+        with c2:
+            st.metric(
+                "Team Size",
+                team_size
+        )
+
+        st.write(
+            "Total pool expected points:",
+            round(
+                ideal_pool["expected_points"].sum(),
+                2
+            )
+        )
+
+        st.write(
+            "Total pool credits:",
+            round(
+                ideal_pool["credits"].sum(),
+                2
+            )
         )
