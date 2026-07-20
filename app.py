@@ -1642,6 +1642,13 @@ def build_dream_team(
 ):
     return pd.DataFrame(), 0
 
+def optimize_expected_team(
+    pool_df,
+    budget=100,
+    team_size=8
+):
+    pass
+
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
@@ -3785,9 +3792,3 @@ with tab_ideal:
             )
         )
 
-def optimize_expected_team(
-    pool_df,
-    budget=100,
-    team_size=8
-):
-    pass
