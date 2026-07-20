@@ -4371,6 +4371,13 @@ with tab_ideal:
                     "#### Actual Pool"
                 )
 
+                st.write(
+                    actual_pool.sort_values(
+                    "actual_points",
+                    ascending=False
+                    )
+                )
+
                 st.dataframe(
                     actual_pool[
                         [
