@@ -4344,6 +4344,25 @@ with tab_ideal:
             points_per_win=POINTS_PER_WIN
         )
 
+        st.write(
+            "Players with actual points > 0:",
+            len(
+                actual_pool[
+                    actual_pool["actual_points"] > 0
+                ]
+            )
+        )
+
+        st.write(
+                actual_pool[
+                    actual_pool["actual_points"] > 0
+            ]
+            .sort_values(
+                "actual_points",
+                ascending=False
+            )        
+        )
+
         st.markdown(
             "#### Actual Pool"
         )
