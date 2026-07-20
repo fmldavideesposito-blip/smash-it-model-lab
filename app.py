@@ -3885,6 +3885,47 @@ with tab_ideal:
             )
         )
 
+        with st.expander("DEBUG Solver"):
+
+            st.write(
+                ideal_team_df[
+                    [
+                        "player",
+                        "credits",
+                        "expected_points"
+                    ]
+                ]
+            )
+
+            st.write(
+                "Credits:",
+                ideal_team_df["credits"].sum()
+            )
+
+            st.write(
+                "Expected:",
+                ideal_team_df["expected_points"].sum()
+            )
+
+            st.write(
+                "Top 20 expected points pool"
+            )
+
+            st.write(
+                ideal_pool.sort_values(
+                    "expected_points",
+                    ascending=False
+                )
+                [
+                    [
+                        "player",
+                        "credits",
+                        "expected_points"
+                    ]
+                ]
+                .head(20)
+            )
+
         if ideal_team_df.empty:
 
             st.error(
@@ -3906,7 +3947,17 @@ with tab_ideal:
 
             st.markdown(
             "### Ideal Team"
-        )
+            )
+
+            st.write(
+                "Credits total:",
+                ideal_team_df["credits"].sum()
+            )
+
+            st.write(
+                "Expected total:",
+                ideal_team_df["expected_points"].sum()
+            )
 
             st.dataframe(
             ideal_team_df[
