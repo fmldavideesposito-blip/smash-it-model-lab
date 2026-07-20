@@ -3908,7 +3908,7 @@ with tab_ideal:
             "### Ideal Team"
         )
 
-        st.dataframe(
+            st.dataframe(
             ideal_team_df[
                 [
                     "player",
