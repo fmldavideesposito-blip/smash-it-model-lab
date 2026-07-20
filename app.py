@@ -4084,6 +4084,57 @@ with tab_ideal:
         ideal_pool["credits"] = ideal_pool["credits"].astype(float)
         ideal_pool["expected_points"] = ideal_pool["expected_points"].astype(float)
 
+        if "prediction_log_master" in st.session_state:
+
+            warehouse = st.session_state[
+                "prediction_log_master"
+            ]
+
+            available_runs = sorted(
+                warehouse["run_id"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            )
+
+            selected_run = st.selectbox(
+                "Select Prediction Run",
+                available_runs,
+                key="ideal_run_selector"
+            )
+
+            run_df = warehouse[
+            warehouse["run_id"].astype(str)
+                == str(selected_run)
+            ].copy()
+
+            budget = int(
+                pd.to_numeric(
+                    run_df["budget"],
+                    errors="coerce"
+                ).iloc[0]
+            )
+
+            team_size = int(
+                pd.to_numeric(
+                    run_df["team_size"],
+                    errors="coerce"
+                ).iloc[0]
+            )
+
+            st.success(
+                f"Run loaded | Budget={budget} | Team Size={team_size}"
+            )
+
+        else:
+
+            st.warning(
+                "Prediction Warehouse not loaded."
+            )
+
+            st.stop()
+        
         budget = 100
         team_size = 8
         
