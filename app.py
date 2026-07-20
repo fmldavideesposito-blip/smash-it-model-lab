@@ -3612,9 +3612,41 @@ with tab_ideal:
             f"{len(ranking_df)} players loaded"
         )
 
+        with st.expander("DEBUG Columns"):
+            st.write(ranking_df.columns.tolist())
+
         st.dataframe(
             ranking_df.head(20)
         )
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.metric(
+                "Players",
+                len(ranking_df)
+            )
+
+        with c2:
+            st.metric(
+                "Best Expected Points",
+                round(
+                    ranking_df["expected_points_v13"].max(),
+                    1
+                )
+            )
+
+        with c3:
+            st.metric(
+                "Avg Credits",
+                round(
+                    pd.to_numeric(
+                        ranking_df["Smash IT Credits CW N"],
+                        errors="coerce"
+                    ).mean(),
+                    1
+                )
+            )
 
         required_cols = [
         "Player",
@@ -3634,3 +3666,25 @@ with tab_ideal:
             )
 
             st.stop()
+
+        ranking_df = ranking_df.sort_values(
+            "rank_v13"
+        )
+
+        st.markdown(
+            "### Top Predicted Players"
+        )
+
+        st.dataframe(
+            ranking_df[
+                [
+                    "Player",
+                    "Smash IT Credits CW N",
+                    "expected_points_v13",
+                    "rank_v13"
+                ]
+            ]
+            .head(20),
+            use_container_width=True,
+            hide_index=True
+        )
