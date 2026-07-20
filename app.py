@@ -2026,7 +2026,7 @@ def build_actual_points_for_pool(
     )
 
     return pool
-``
+
 
 # ------------------------------------------------------------
 # Tabs principali
