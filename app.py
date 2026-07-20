@@ -4709,9 +4709,14 @@ with tab_ideal:
         
         capture_history_df = load_capture_history()
 
-        capture_history_df = capture_history_df.sort_values(
-            "capture_rate_pct"
-        )
+        if (
+            not capture_history_df.empty
+            and "capture_rate_pct" in capture_history_df.columns
+        ):
+
+            capture_history_df = capture_history_df.sort_values(
+                "capture_rate_pct"
+            )
 
         capture_history_df = capture_history_df.sort_values(
             [
