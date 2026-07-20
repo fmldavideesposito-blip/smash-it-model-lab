@@ -1813,91 +1813,7 @@ def optimize_expected_team(
 
     return team_df, total_points
 
-    players = []
-
-    for _, row in pool_df.iterrows():
-
-        players.append(
-            (
-                row["player"],
-                float(row["credits"]),
-                float(row["expected_points"])
-            )
-        )
-
-    dp = {
-        (0, 0): (
-            0,
-            ()
-        )
-    }
-
-    for i, (_, credits, points) in enumerate(players):
-
-        nd = dict(dp)
-
-        cost = int(round(credits))
-
-        for (spent, count), val in dp.items():
-
-            if count >= team_size:
-                continue
-
-            new_spent = spent + cost
-
-            if new_spent > budget:
-                continue
-
-            key = (
-                new_spent,
-                count + 1
-            )
-
-            score = val[0] + points
-
-            idxs = val[1] + (i,)
-
-            candidate = (
-                score,
-                idxs
-            )
-
-            if (
-                key not in nd
-                or
-                candidate[0] > nd[key][0]
-            ):
-                nd[key] = candidate
-
-        dp = nd
-
-    best_score = -1
-    best_idxs = ()
-
-    for (spent, count), val in dp.items():
-
-        if count == team_size:
-
-            if val[0] > best_score:
-
-                best_score = val[0]
-                best_idxs = val[1]
-
-    if not best_idxs:
-
-        return pd.DataFrame(), 0
-
-    team = pool_df.iloc[
-        list(best_idxs)
-    ].copy()
-
-    return (
-        team.sort_values(
-            "expected_points",
-            ascending=False
-        ),
-        round(best_score, 2)
-    )
+    
 
 def build_actual_points_for_pool(
     pool_df,
@@ -3860,6 +3776,27 @@ with tab_dream:
             run_options
         )
 
+        run_tournament = (
+            run_df["tournament"]
+            .iloc[0]
+        )
+
+        run_year = int(
+            pd.to_numeric(
+                run_df["year"],
+                errors="coerce"
+            ).iloc[0]
+        )
+
+        st.info(
+            f"""
+            Tournament = {run_tournament}
+            | Year = {run_year}
+            | Budget = {budget}
+            | Team Size = {team_size}
+            """
+        )
+
         strategy_filter = st.selectbox(
             "Strategy",
             [
@@ -4135,10 +4072,6 @@ with tab_ideal:
 
             st.stop()
         
-        budget = 100
-        team_size = 8
-        
-        
         ideal_pool = ideal_pool.dropna(
             subset=[
                 "credits",
@@ -4333,7 +4266,7 @@ with tab_ideal:
             hide_index=True
         )
 
-                    # ----------------------------------------------------
+        # ----------------------------------------------------
         # TRUE IDEAL TEAM BACKTEST - usando actual_points
         # ----------------------------------------------------
         st.markdown(
@@ -4366,11 +4299,7 @@ with tab_ideal:
                     .tolist()
                 )
 
-                selected_actual_tournament_for_ideal = st.selectbox(
-                    "Select actual tournament for Ideal Team Backtest",
-                    actual_tournament_options,
-                    key="ideal_actual_tournament"
-                )
+                
 
                 actual_year_options = [
                     "All Years"
@@ -4404,17 +4333,11 @@ with tab_ideal:
                         .tolist()
                     )
 
-                selected_actual_year_for_ideal = st.selectbox(
-                    "Select actual year",
-                    actual_year_options,
-                    key="ideal_actual_year"
-                )
-
                 actual_pool = build_actual_points_for_pool(
                     pool_df=ideal_pool,
                     actual_df=actual_df,
-                    actual_tournament=selected_actual_tournament_for_ideal,
-                    actual_year=selected_actual_year_for_ideal,
+                    actual_tournament=run_tournament,
+                    actual_year=run_year,
                     points_per_win=POINTS_PER_WIN
                 )
 
