@@ -1654,7 +1654,7 @@ tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration, tab_dream, tab
         "🧪 Calibration Lab",
         "🏆 Dream Team Lab",
         "🏆 Ideal Team Backtest",
-        🏆 Ideal Team Backtest
+        "🏆 Ideal Team Backtest"
     ]
 )
 
