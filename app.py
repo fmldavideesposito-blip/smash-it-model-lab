@@ -3651,7 +3651,8 @@ with tab_ideal:
         required_cols = [
         "Player",
         "Smash IT Credits CW N",
-        "expected_points_v13"
+        "expected_points_v13",
+        "rank_v13"
 ]       
 
         missing = [
@@ -3666,6 +3667,33 @@ with tab_ideal:
             )
 
             st.stop()
+
+        ideal_pool = ranking_df[
+            [
+                "Player",
+                 "Smash IT Credits CW N",
+                "expected_points_v13",
+                "rank_v13"
+            ]
+        ].copy()
+
+        ideal_pool = ideal_pool.rename(
+            columns={
+                "Player": "player",
+                "Smash IT Credits CW N": "credits",
+                "expected_points_v13": "expected_points"
+                }
+        )
+
+        ideal_pool["credits"] = pd.to_numeric(
+            ideal_pool["credits"],
+            errors="coerce"
+        )
+
+        ideal_pool["expected_points"] = pd.to_numeric(
+            ideal_pool["expected_points"],
+            errors="coerce"
+        )
 
         ranking_df = ranking_df.sort_values(
             "rank_v13"
@@ -3685,6 +3713,14 @@ with tab_ideal:
                 ]
             ]
             .head(20),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.markdown("### Ideal Pool")
+
+        st.dataframe(
+            ideal_pool.head(20),
             use_container_width=True,
             hide_index=True
         )
