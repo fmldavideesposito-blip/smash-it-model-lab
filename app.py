@@ -3695,6 +3695,9 @@ with tab_ideal:
             errors="coerce"
         )
 
+        ideal_pool["credits"] = ideal_pool["credits"].astype(float)
+        ideal_pool["expected_points"] = ideal_pool["expected_points"].astype(float)
+
         ideal_pool = ideal_pool.dropna(
             subset=[
                 "credits",
@@ -3702,9 +3705,21 @@ with tab_ideal:
             ]
         ).copy()
 
+        if len(ideal_pool) < team_size:
+
+            st.error(
+                f"Only {len(ideal_pool)} players available."
+            )
+        
+            st.stop()
+
         ranking_df = ranking_df.sort_values(
             "rank_v13"
         )
+
+        ideal_pool = ideal_pool.sort_values(
+            "rank_v13"
+        ).reset_index(drop=True)
 
         st.markdown(
             "### Top Predicted Players"
