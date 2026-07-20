@@ -4541,3 +4541,179 @@ with tab_ideal:
             "Overlapping players:",
             overlap_players
         )
+
+                            # ------------------------------------------------
+                    # Missed Value Feature Analysis
+                    # ------------------------------------------------
+                    st.markdown(
+                        "#### Missed Value Feature Analysis"
+                    )
+
+                    expected_players = set(
+                        ideal_team_df["player"]
+                        .astype(str)
+                        .tolist()
+                    )
+
+                    true_ideal_players = set(
+                        actual_ideal_team_df["player"]
+                        .astype(str)
+                        .tolist()
+                    )
+
+                    missed_players = sorted(
+                        true_ideal_players
+                        -
+                        expected_players
+                    )
+
+                    selected_but_not_ideal = sorted(
+                        expected_players
+                        -
+                        true_ideal_players
+                    )
+
+                    st.write(
+                        "Missed true ideal players:",
+                        missed_players
+                    )
+
+                    st.write(
+                        "Selected but not in true ideal:",
+                        selected_but_not_ideal
+                    )
+
+                    missed_df = actual_pool[
+                        actual_pool["player"]
+                        .astype(str)
+                        .isin(missed_players)
+                    ].copy()
+
+                    selected_not_ideal_df = actual_pool[
+                        actual_pool["player"]
+                        .astype(str)
+                        .isin(selected_but_not_ideal)
+                    ].copy()
+
+                    comparison_cols = [
+                        "player",
+                        "credits",
+                        "expected_points",
+                        "actual_wins",
+                        "actual_points",
+                        "rank_v13"
+                    ]
+
+                    optional_feature_cols = [
+                        "seed",
+                        "overall_elo",
+                        "selected_surface_elo",
+                        "peak_elo",
+                        "recent_form",
+                        "surface_form_60d",
+                        "same_surface_ratio_60d",
+                        "fatigue_load",
+                        "minutes_30d",
+                        "service_dominance",
+                        "return_dominance",
+                        "qualifier_momentum_raw",
+                        "local_home_raw",
+                        "value_index",
+                        "matches_in_db"
+                    ]
+
+                    available_feature_cols = [
+                        c for c in optional_feature_cols
+                        if c in actual_pool.columns
+                    ]
+
+                    display_cols = (
+                        comparison_cols
+                        + available_feature_cols
+                    )
+
+                    display_cols = [
+                        c for c in display_cols
+                        if c in actual_pool.columns
+                    ]
+
+                    st.markdown(
+                        "##### Missed True Ideal Players"
+                    )
+
+                    st.dataframe(
+                        missed_df[
+                            display_cols
+                        ].sort_values(
+                            "actual_points",
+                            ascending=False
+                        ),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    st.markdown(
+                        "##### Selected Players Not In True Ideal"
+                    )
+
+                    st.dataframe(
+                        selected_not_ideal_df[
+                            display_cols
+                        ].sort_values(
+                            "expected_points",
+                            ascending=False
+                        ),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    # ------------------------------------------------
+                    # Underestimation metrics
+                    # ------------------------------------------------
+                    missed_df["actual_minus_expected"] = (
+                        missed_df["actual_points"]
+                        -
+                        missed_df["expected_points"]
+                    )
+
+                    missed_df["actual_to_expected_ratio"] = (
+                        missed_df["actual_points"]
+                        /
+                        missed_df["expected_points"]
+                    ).replace(
+                        [float("inf")],
+                        0
+                    ).fillna(0)
+
+                    missed_df["actual_points_per_credit"] = (
+                        missed_df["actual_points"]
+                        /
+                        missed_df["credits"]
+                    ).replace(
+                        [float("inf")],
+                        0
+                    ).fillna(0)
+
+                    st.markdown(
+                        "##### Biggest Underestimated Players"
+                    )
+
+                    st.dataframe(
+                        missed_df[
+                            [
+                                "player",
+                                "credits",
+                                "expected_points",
+                                "actual_points",
+                                "actual_minus_expected",
+                                "actual_to_expected_ratio",
+                                "actual_points_per_credit",
+                                "rank_v13"
+                            ]
+                        ].sort_values(
+                            "actual_minus_expected",
+                            ascending=False
+                        ),
+                        use_container_width=True,
+                        hide_index=True
+                    )
