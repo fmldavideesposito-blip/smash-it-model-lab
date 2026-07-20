@@ -1642,11 +1642,176 @@ def build_dream_team(
 ):
     return pd.DataFrame(), 0
 
+def optimize_team_by_score(
+    pool_df,
+    score_col,
+    budget=100,
+    team_size=8
+):
+    """
+    Ottimizza una squadra massimizzando score_col
+    rispettando budget e team_size.
+
+    Usa crediti decimali convertiti in decimi:
+    13.3 -> 133
+    8.2  -> 82
+    budget 100 -> 1000
+    """
+
+    required_cols = [
+        "player",
+        "credits",
+        score_col
+    ]
+
+    missing_cols = [
+        c for c in required_cols
+        if c not in pool_df.columns
+    ]
+
+    if missing_cols:
+        return pd.DataFrame(), 0, 0
+
+    work_df = pool_df.copy()
+
+    work_df["credits"] = pd.to_numeric(
+        work_df["credits"],
+        errors="coerce"
+    )
+
+    work_df[score_col] = pd.to_numeric(
+        work_df[score_col],
+        errors="coerce"
+    )
+
+    work_df = work_df.dropna(
+        subset=[
+            "credits",
+            score_col
+        ]
+    ).copy()
+
+    if len(work_df) < team_size:
+        return pd.DataFrame(), 0, 0
+
+    work_df = work_df.reset_index(drop=True)
+
+    budget_int = int(
+        round(
+            budget * 10
+        )
+    )
+
+    players = []
+
+    for i, row in work_df.iterrows():
+
+        players.append(
+            {
+                "idx": i,
+                "player": row["player"],
+                "credits": float(row["credits"]),
+                "cost_int": int(
+                    round(
+                        float(row["credits"]) * 10
+                    )
+                ),
+                "score": float(row[score_col])
+            }
+        )
+
+    dp = {
+        (0, 0): (
+            0.0,
+            ()
+        )
+    }
+
+    for p in players:
+
+        nd = dict(dp)
+
+        for (spent, count), val in dp.items():
+
+            if count >= team_size:
+                continue
+
+            new_spent = spent + p["cost_int"]
+
+            if new_spent > budget_int:
+                continue
+
+            key = (
+                new_spent,
+                count + 1
+            )
+
+            new_score = val[0] + p["score"]
+
+            new_idxs = val[1] + (
+                p["idx"],
+            )
+
+            candidate = (
+                new_score,
+                new_idxs
+            )
+
+            if (
+                key not in nd
+                or
+                candidate[0] > nd[key][0]
+            ):
+                nd[key] = candidate
+
+        dp = nd
+
+    best_score = -1
+    best_idxs = ()
+    best_spent = 0
+
+    for (spent, count), val in dp.items():
+
+        if count == team_size:
+
+            if val[0] > best_score:
+
+                best_score = val[0]
+                best_idxs = val[1]
+                best_spent = spent
+
+    if not best_idxs:
+        return pd.DataFrame(), 0, 0
+
+    team_df = work_df.iloc[
+        list(best_idxs)
+    ].copy()
+
+    team_df = team_df.sort_values(
+        score_col,
+        ascending=False
+    ).reset_index(drop=True)
+
+    return (
+        team_df,
+        round(best_score, 2),
+        round(best_spent / 10, 1)
+    )
+
+
 def optimize_expected_team(
     pool_df,
     budget=100,
     team_size=8
 ):
+    team_df, total_points, total_credits = optimize_team_by_score(
+        pool_df=pool_df,
+        score_col="expected_points",
+        budget=budget,
+        team_size=team_size
+    )
+
+    return team_df, total_points
 
     players = []
 
@@ -1733,6 +1898,135 @@ def optimize_expected_team(
         ),
         round(best_score, 2)
     )
+
+def build_actual_points_for_pool(
+    pool_df,
+    actual_df,
+    actual_tournament,
+    actual_year=None,
+    points_per_win=25
+):
+    """
+    Arricchisce il pool del ranking_completo.csv con:
+    - actual_wins
+    - actual_points
+    - actual_matches_in_tournament
+
+    usando i risultati reali TennisMyLife.
+    """
+
+    if pool_df is None or pool_df.empty:
+        return pd.DataFrame()
+
+    if actual_df is None or actual_df.empty:
+        return pool_df.copy()
+
+    if "winner_name" not in actual_df.columns:
+        return pool_df.copy()
+
+    if "tourney_name" not in actual_df.columns:
+        return pool_df.copy()
+
+    pool = pool_df.copy()
+    actual = actual_df.copy()
+
+    pool["player_norm"] = (
+        pool["player"]
+        .apply(normalize_player_name)
+    )
+
+    actual = actual[
+        actual["tourney_name"]
+        .astype(str)
+        == str(actual_tournament)
+    ].copy()
+
+    if actual_year is not None and actual_year != "All Years":
+
+        if "source_year" in actual.columns:
+
+            actual["actual_year"] = pd.to_numeric(
+                actual["source_year"],
+                errors="coerce"
+            )
+
+        elif "tourney_date" in actual.columns:
+
+            actual["actual_year"] = pd.to_numeric(
+                actual["tourney_date"]
+                .astype(str)
+                .str.slice(0, 4),
+                errors="coerce"
+            )
+
+        else:
+
+            actual["actual_year"] = pd.NA
+
+        actual = actual[
+            actual["actual_year"] == int(actual_year)
+        ].copy()
+
+    if actual.empty:
+
+        pool["actual_wins"] = 0
+        pool["actual_points"] = 0
+        pool["actual_matches_in_tournament"] = 0
+
+        return pool
+
+    actual["winner_norm"] = (
+        actual["winner_name"]
+        .apply(normalize_player_name)
+    )
+
+    wins_df = (
+        actual
+        .groupby(
+            "winner_norm",
+            dropna=False
+        )
+        .agg(
+            actual_wins=("winner_name", "count")
+        )
+        .reset_index()
+    )
+
+    wins_df["actual_points"] = (
+        wins_df["actual_wins"]
+        * points_per_win
+    )
+
+    pool = pool.merge(
+        wins_df,
+        left_on="player_norm",
+        right_on="winner_norm",
+        how="left"
+    )
+
+    pool["actual_wins"] = (
+        pool["actual_wins"]
+        .fillna(0)
+        .astype(int)
+    )
+
+    pool["actual_points"] = (
+        pool["actual_points"]
+        .fillna(0)
+        .astype(float)
+    )
+
+    pool["actual_matches_in_tournament"] = len(actual)
+
+    pool = pool.drop(
+        columns=[
+            "winner_norm"
+        ],
+        errors="ignore"
+    )
+
+    return pool
+``
 
 # ------------------------------------------------------------
 # Tabs principali
@@ -3987,6 +4281,255 @@ with tab_ideal:
             use_container_width=True,
             hide_index=True
         )
+
+                    # ----------------------------------------------------
+        # TRUE IDEAL TEAM BACKTEST - usando actual_points
+        # ----------------------------------------------------
+        st.markdown(
+            "### True Ideal Team Backtest"
+        )
+
+        if "actual_results" not in st.session_state:
+
+            st.info(
+                "Load Actual Results first to calculate the true ideal team."
+            )
+
+        else:
+
+            actual_df = st.session_state["actual_results"]
+
+            if "tourney_name" not in actual_df.columns:
+
+                st.warning(
+                    "Actual results do not contain tourney_name."
+                )
+
+            else:
+
+                actual_tournament_options = sorted(
+                    actual_df["tourney_name"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
+
+                selected_actual_tournament_for_ideal = st.selectbox(
+                    "Select actual tournament for Ideal Team Backtest",
+                    actual_tournament_options,
+                    key="ideal_actual_tournament"
+                )
+
+                actual_year_options = [
+                    "All Years"
+                ]
+
+                if "source_year" in actual_df.columns:
+
+                    actual_year_options += sorted(
+                        pd.to_numeric(
+                            actual_df["source_year"],
+                            errors="coerce"
+                        )
+                        .dropna()
+                        .astype(int)
+                        .unique()
+                        .tolist()
+                    )
+
+                elif "tourney_date" in actual_df.columns:
+
+                    actual_year_options += sorted(
+                        pd.to_numeric(
+                            actual_df["tourney_date"]
+                            .astype(str)
+                            .str.slice(0, 4),
+                            errors="coerce"
+                        )
+                        .dropna()
+                        .astype(int)
+                        .unique()
+                        .tolist()
+                    )
+
+                selected_actual_year_for_ideal = st.selectbox(
+                    "Select actual year",
+                    actual_year_options,
+                    key="ideal_actual_year"
+                )
+
+                actual_pool = build_actual_points_for_pool(
+                    pool_df=ideal_pool,
+                    actual_df=actual_df,
+                    actual_tournament=selected_actual_tournament_for_ideal,
+                    actual_year=selected_actual_year_for_ideal,
+                    points_per_win=POINTS_PER_WIN
+                )
+
+                st.markdown(
+                    "#### Actual Pool"
+                )
+
+                st.dataframe(
+                    actual_pool[
+                        [
+                            "player",
+                            "credits",
+                            "expected_points",
+                            "actual_wins",
+                            "actual_points",
+                            "rank_v13"
+                        ]
+                    ].sort_values(
+                        "actual_points",
+                        ascending=False
+                    ),
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                actual_ideal_team_df, actual_ideal_points, actual_ideal_credits = (
+                    optimize_team_by_score(
+                        pool_df=actual_pool,
+                        score_col="actual_points",
+                        budget=budget,
+                        team_size=team_size
+                    )
+                )
+
+                if actual_ideal_team_df.empty:
+
+                    st.warning(
+                        "Unable to generate true ideal team from actual results."
+                    )
+
+                else:
+
+                    st.success(
+                        f"True ideal team generated ({len(actual_ideal_team_df)} players)"
+                    )
+
+                    c1, c2, c3 = st.columns(3)
+
+                    with c1:
+                        st.metric(
+                            "Actual Ideal Players",
+                            len(actual_ideal_team_df)
+                        )
+
+                    with c2:
+                        st.metric(
+                            "Actual Ideal Credits",
+                            round(
+                                actual_ideal_credits,
+                                1
+                            )
+                        )
+
+                    with c3:
+                        st.metric(
+                            "Actual Ideal Points",
+                            round(
+                                actual_ideal_points,
+                                1
+                            )
+                        )
+
+                    st.markdown(
+                        "#### True Ideal Team"
+                    )
+
+                    st.dataframe(
+                        actual_ideal_team_df[
+                            [
+                                "player",
+                                "credits",
+                                "expected_points",
+                                "actual_wins",
+                                "actual_points",
+                                "rank_v13"
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    # ------------------------------------------------
+                    # Gap Analysis
+                    # ------------------------------------------------
+                    expected_team_with_actuals = actual_pool[
+                        actual_pool["player"].isin(
+                            ideal_team_df["player"].tolist()
+                        )
+                    ].copy()
+
+                    expected_team_actual_points = (
+                        expected_team_with_actuals["actual_points"]
+                        .sum()
+                    )
+
+                    gap_points = (
+                        actual_ideal_points
+                        - expected_team_actual_points
+                    )
+
+                    capture_rate = (
+                        expected_team_actual_points
+                        / actual_ideal_points
+                        * 100
+                        if actual_ideal_points > 0
+                        else 0
+                    )
+
+                    st.markdown(
+                        "#### Gap Analysis"
+                    )
+
+                    g1, g2, g3 = st.columns(3)
+
+                    with g1:
+                        st.metric(
+                            "Expected Team Actual Points",
+                            round(
+                                expected_team_actual_points,
+                                1
+                            )
+                        )
+
+                    with g2:
+                        st.metric(
+                            "Gap vs True Ideal",
+                            round(
+                                gap_points,
+                                1
+                            )
+                        )
+
+                    with g3:
+                        st.metric(
+                            "Capture Rate",
+                            f"{capture_rate:.1f}%"
+                        )
+
+                    overlap_players = sorted(
+                        set(
+                            ideal_team_df["player"]
+                            .astype(str)
+                            .tolist()
+                        )
+                        &
+                        set(
+                            actual_ideal_team_df["player"]
+                            .astype(str)
+                            .tolist()
+                        )
+                    )
+
+                    st.write(
+                        "Overlapping players:",
+                        overlap_players
+                    )
 
             with c1:
                 st.metric(
