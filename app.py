@@ -1645,14 +1645,15 @@ def build_dream_team(
 # ------------------------------------------------------------
 # Tabs principali
 # ------------------------------------------------------------
-tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration, tab_dream = st.tabs(
+tab_pred, tab_summary, tab_actual, tab_backtest, tab_calibration, tab_dream, tab_ideal = st.tabs(
     [
         "Predictions",
         "Prediction Warehouse",
         "Actual Results",
         "Backtesting",
         "🧪 Calibration Lab",
-        "🏆 Dream Team Lab"
+        "🏆 Dream Team Lab",
+        "🏆 Ideal Team Backtest"
     ]
 )
 
@@ -3578,6 +3579,58 @@ with tab_dream:
 
             st.error(
                 f"Missing columns: {missing_cols}"
+            )
+
+            st.stop()
+
+# ------------------------------------------------------------
+# TAB 7 — Ideal Team Backtest
+# ------------------------------------------------------------
+
+with tab_ideal:
+
+    st.subheader("🏆 Ideal Team Backtest")
+
+    ranking_file = st.file_uploader(
+        "Upload ranking_completo.csv",
+        type=["csv"],
+        key="ideal_ranking"
+    )
+
+    if ranking_file:
+
+        ranking_df = pd.read_csv(
+            ranking_file,
+            sep=";",
+            decimal=",",
+            encoding="utf-8-sig"
+        )
+
+        st.session_state["ideal_ranking"] = ranking_df
+
+        st.success(
+            f"{len(ranking_df)} players loaded"
+        )
+
+        st.dataframe(
+            ranking_df.head(20)
+        )
+
+        required_cols = [
+        "Player",
+        "Smash IT Credits CW N",
+        "expected_points_v13"
+]       
+
+        missing = [
+            c for c in required_cols
+            if c not in ranking_df.columns
+        ]
+
+        if missing:
+
+            st.error(
+                f"Missing columns: {missing}"
             )
 
             st.stop()
