@@ -1647,7 +1647,92 @@ def optimize_expected_team(
     budget=100,
     team_size=8
 ):
-    pass
+
+    players = []
+
+    for _, row in pool_df.iterrows():
+
+        players.append(
+            (
+                row["player"],
+                float(row["credits"]),
+                float(row["expected_points"])
+            )
+        )
+
+    dp = {
+        (0, 0): (
+            0,
+            ()
+        )
+    }
+
+    for i, (_, credits, points) in enumerate(players):
+
+        nd = dict(dp)
+
+        cost = int(round(credits))
+
+        for (spent, count), val in dp.items():
+
+            if count >= team_size:
+                continue
+
+            new_spent = spent + cost
+
+            if new_spent > budget:
+                continue
+
+            key = (
+                new_spent,
+                count + 1
+            )
+
+            score = val[0] + points
+
+            idxs = val[1] + (i,)
+
+            candidate = (
+                score,
+                idxs
+            )
+
+            if (
+                key not in nd
+                or
+                candidate[0] > nd[key][0]
+            ):
+                nd[key] = candidate
+
+        dp = nd
+
+    best_score = -1
+    best_idxs = ()
+
+    for (spent, count), val in dp.items():
+
+        if count == team_size:
+
+            if val[0] > best_score:
+
+                best_score = val[0]
+                best_idxs = val[1]
+
+    if not best_idxs:
+
+        return pd.DataFrame(), 0
+
+    team = pool_df.iloc[
+        list(best_idxs)
+    ].copy()
+
+    return (
+        team.sort_values(
+            "expected_points",
+            ascending=False
+        ),
+        round(best_score, 2)
+    )
 
 # ------------------------------------------------------------
 # Tabs principali
@@ -3792,3 +3877,64 @@ with tab_ideal:
             )
         )
 
+        ideal_team_df, ideal_points = (
+            optimize_expected_team(
+                ideal_pool,
+                budget=budget,
+                team_size=team_size
+            )
+        )
+
+        if ideal_team_df.empty:
+
+            st.error(
+                "Unable to generate ideal team."
+            )
+
+        else:
+
+            st.success(
+                f"Ideal team generated ({len(ideal_team_df)} players)"
+            )
+
+            total_credits = (
+                ideal_team_df["credits"]
+                .sum()
+            )
+
+            c1, c2, c3 = st.columns(3)
+
+            st.markdown(
+            "### Ideal Team"
+        )
+
+        st.dataframe(
+            ideal_team_df[
+                [
+                    "player",
+                    "credits",
+                    "expected_points",
+                    "rank_v13"
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True
+        )
+
+            with c1:
+                st.metric(
+                    "Players",
+                    len(ideal_team_df)
+                )
+
+            with c2:
+                st.metric(
+                    "Credits Used",
+                    round(total_credits, 1)
+                )
+
+            with c3:
+                st.metric(
+                    "Expected Points",
+                    round(ideal_points, 1)
+                )
