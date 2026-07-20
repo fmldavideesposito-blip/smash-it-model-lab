@@ -3606,7 +3606,7 @@ with tab_ideal:
             encoding="utf-8-sig"
         )
 
-        st.session_state["ideal_ranking"] = ranking_df
+        st.session_state["ranking_df"] = ranking_df
 
         st.success(
             f"{len(ranking_df)} players loaded"
