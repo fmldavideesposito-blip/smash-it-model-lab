@@ -186,6 +186,41 @@ ACTUAL_MASTER_FILE = (
     DATA_DIR / "actual_results_master.csv"
 )
 
+CAPTURE_HISTORY_FILE = (
+    DATA_DIR / "capture_rate_history.csv"
+)
+
+def save_actual_master(df):
+
+    df.to_csv(
+        ACTUAL_MASTER_FILE,
+        ...
+    )
+
+def load_capture_history():
+
+    try:
+
+        return load_csv_from_github(
+            "data/capture_rate_history.csv"
+        )
+
+    except Exception:
+
+        return pd.DataFrame()
+
+
+def save_capture_history(df):
+
+    upload_csv_to_github(
+        df=df,
+        path="data/capture_rate_history.csv",
+        commit_message=(
+            f"Update Capture Rate History "
+            f"{pd.Timestamp.now()}"
+        )
+    )
+
 def load_prediction_master():
 
     try:
@@ -1851,10 +1886,20 @@ def build_actual_points_for_pool(
         .apply(normalize_player_name)
     )
 
-    actual = actual[
+    actual["tourney_norm"] = (
         actual["tourney_name"]
-        .astype(str)
-        == str(actual_tournament)
+        .apply(normalize_tournament_name)
+    )
+
+    run_tournament_norm = (
+        normalize_tournament_name(
+            actual_tournament
+        )
+    )
+
+    actual = actual[
+        actual["tourney_norm"]
+        == run_tournament_norm
     ].copy()
 
     if actual_year is not None and actual_year != "All Years":
@@ -4572,6 +4617,197 @@ with tab_ideal:
             "Overlapping players:",
             overlap_players
         )
+
+        # ----------------------------------------------------
+        # Capture Rate History
+        # ----------------------------------------------------
+        history_row = {
+            "run_id": selected_run,
+            "tournament": run_tournament,
+            "year": run_year,
+            "budget": budget,
+            "team_size": team_size,
+            "expected_team_actual_points": round(
+                expected_team_actual_points,
+                1
+            ),
+            "true_ideal_points": round(
+                actual_ideal_points,
+                1
+            ),
+            "gap_vs_true_ideal": round(
+                gap_points,
+                1
+            ),
+            "capture_rate_pct": round(
+                capture_rate,
+                1
+            ),
+            "expected_team_credits": round(
+                ideal_team_df["credits"].sum(),
+                1
+            ),
+            "true_ideal_credits": round(
+                actual_ideal_credits,
+                1
+            ),
+            "overlap_players": ", ".join(
+                overlap_players
+            ),
+            "overlap_count": len(
+                overlap_players
+            )
+        }
+
+        capture_history_df = load_capture_history()
+
+        capture_history_df = pd.concat(
+            [
+                capture_history_df,
+                pd.DataFrame(
+                    [
+                        history_row
+                    ]
+                )
+            ],
+            ignore_index=True
+        )
+
+        capture_history_df = capture_history_df.drop_duplicates(
+            subset=[
+                "run_id",
+                "tournament",
+                "year"
+            ],
+            keep="last"
+        )
+
+        save_capture_history(
+            capture_history_df
+        )
+        st.markdown(
+            "#### Capture Rate History"
+        )
+
+        st.dataframe(
+            capture_history_df[
+                [
+                    "tournament",
+                    "year",
+                    "capture_rate_pct",
+                    "gap_vs_true_ideal",
+                    "expected_team_actual_points",
+                    "true_ideal_points"
+                ]
+            ]
+            .sort_values(
+                "capture_rate_pct"
+            ),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        capture_history_df = load_capture_history()
+
+        capture_history_df = capture_history_df.sort_values(
+            "capture_rate_pct"
+        )
+
+        capture_history_df = capture_history_df.sort_values(
+            [
+                "year",
+                "tournament"
+            ],
+            ascending=[
+                False,
+                True
+            ]
+        )
+
+        st.dataframe(
+            capture_history_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.download_button(
+            "⬇️ Download capture_rate_history.csv",
+            dataframe_to_csv_bytes(
+                capture_history_df
+            ),
+            file_name="capture_rate_history.csv",
+            mime="text/csv",
+            key="download_capture_rate_history"
+        )
+
+        if not capture_history_df.empty:
+
+            st.markdown(
+                "#### Capture Rate Summary"
+            )
+
+            avg_capture_rate = (
+                capture_history_df[
+                    "capture_rate_pct"
+                ].mean()
+            )
+
+            total_expected_actual = (
+                capture_history_df[
+                    "expected_team_actual_points"
+                ].sum()
+            )
+
+            total_true_ideal = (
+                capture_history_df[
+                    "true_ideal_points"
+                ].sum()
+            )
+
+            total_gap = (
+                capture_history_df[
+                    "gap_vs_true_ideal"
+                ].sum()
+            )
+
+            s1, s2, s3, s4 = st.columns(4)
+
+            with s1:
+                st.metric(
+                    "Tournaments Reviewed",
+                    len(
+                        capture_history_df
+                    )
+                )
+
+            with s2:
+                st.metric(
+                    "Average Capture Rate",
+                    f"{avg_capture_rate:.1f}%"
+                )
+
+            with s3:
+                st.metric(
+                    "Total Gap",
+                    round(
+                        total_gap,
+                        1
+                    )
+                )
+
+            with s4:
+                portfolio_capture_rate = (
+                    total_expected_actual
+                    / total_true_ideal
+                    * 100
+                    if total_true_ideal > 0
+                    else 0
+                )
+
+                st.metric(
+                    "Portfolio Capture Rate",
+                    f"{portfolio_capture_rate:.1f}%"
+                )
 
         # ------------------------------------------------
         # Missed Value Feature Analysis
