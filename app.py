@@ -2128,7 +2128,7 @@ with tab_summary:
     # ----------------------------------------------------
     if (
         "prediction_log_master" in st.session_state
-        and uploaded_logs is None
+        and not uploaded_logs
     ):
 
         master_df = st.session_state[
