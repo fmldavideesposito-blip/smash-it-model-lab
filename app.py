@@ -3698,6 +3698,10 @@ with tab_ideal:
         ideal_pool["credits"] = ideal_pool["credits"].astype(float)
         ideal_pool["expected_points"] = ideal_pool["expected_points"].astype(float)
 
+        budget = 100
+        team_size = 8
+        
+        
         ideal_pool = ideal_pool.dropna(
             subset=[
                 "credits",
@@ -3746,9 +3750,6 @@ with tab_ideal:
             use_container_width=True,
             hide_index=True
         )
-
-        budget = 100
-        team_size = 8
 
         st.markdown(
             "### Optimization Parameters"
