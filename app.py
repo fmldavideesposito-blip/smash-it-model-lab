@@ -3908,6 +3908,22 @@ with tab_ideal:
             )
 
             st.write(
+                ideal_pool.sort_values(
+                    "expected_points",
+                    ascending=False
+                )
+                [
+                    [
+                        "player",
+                        "credits",
+                        "expected_points",
+                        "rank_v13"
+                    ]
+                ]
+                .head(20)
+            )
+
+            st.write(
                 "Top 20 expected points pool"
             )
 
