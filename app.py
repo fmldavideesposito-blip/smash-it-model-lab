@@ -3973,7 +3973,7 @@ with tab_ideal:
 
     capture_history_df = load_capture_history()
 
-        if not capture_history_df.empty:
+    if not capture_history_df.empty:
 
         st.markdown(
             "### Existing Tournament History"
