@@ -2664,7 +2664,7 @@ with tab_actual:
         )
 
         if st.button(
-            "Load Actual Results from TennisMyLife",
+            "Carica i risultati aggiornati da TennisMyLife",
             key="load_tml_dynamic"
         ):
 
@@ -3986,11 +3986,11 @@ with tab_ideal:
         )
 
         st.info(
-            "Upload a ranking_completo.csv only to analyze a NEW tournament."
+            "Carica un ranking_completo.csv solo per analizzare un NUOVO torneo, se ne carichi già esistente questo verrà sostituito dal nuovo ."
         )   
     
     ranking_file = st.file_uploader(
-        "Upload ranking_completo.csv",
+        "Carica ranking_completo.csv",
         type=["csv"],
         key="ideal_ranking"
     )
