@@ -3971,6 +3971,24 @@ with tab_ideal:
 
     st.subheader("🏆 Ideal Team Backtest")
 
+    capture_history_df = load_capture_history()
+
+        if not capture_history_df.empty:
+
+        st.markdown(
+            "### Existing Tournament History"
+        )
+
+        st.dataframe(
+            capture_history_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.info(
+            "Upload a ranking_completo.csv only to analyze a NEW tournament."
+        )   
+    
     ranking_file = st.file_uploader(
         "Upload ranking_completo.csv",
         type=["csv"],
