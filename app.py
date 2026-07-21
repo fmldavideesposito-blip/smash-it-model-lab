@@ -4693,7 +4693,6 @@ with tab_ideal:
 
         capture_history_df = capture_history_df.drop_duplicates(
             subset=[
-                "run_id",
                 "tournament",
                 "year"
             ],
