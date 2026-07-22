@@ -4384,18 +4384,6 @@ with tab_ideal:
                 "Run ID:",
                 selected_history_run_id
             )
-
-        else:
-
-            st.info(
-                "Questo torneo è stato analizzato prima "
-                "dell'introduzione del salvataggio degli artifact dettagliati."
-            )   
-
-            st.write(
-                "Run ID:",
-                selected_history_run_id
-            )
         
     # ----------------------------------------------------
     # Analyze New Tournament
