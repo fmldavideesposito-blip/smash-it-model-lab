@@ -222,10 +222,6 @@ def safe_artifact_key(value):
 
 
 def load_csv_from_github_optional(path):
-    """
-    Carica un CSV da GitHub senza mostrare errore se il file non esiste ancora.
-    Utile per artifact opzionali dello storico.
-    """
 
     try:
 
@@ -4222,9 +4218,20 @@ with tab_ideal:
             for df in historical_artifacts.values()
         )
 
-        if has_any_artifact:
+                if has_any_artifact:
 
-            detail_tabs = st.tabs(
+            st.success(
+                "Artifact dettagliati trovati per questo torneo."
+            )
+
+            (
+                tab_expected_team,
+                tab_true_ideal_team,
+                tab_actual_pool,
+                tab_missed_players,
+                tab_selected_not_ideal,
+                tab_ideal_pool
+            ) = st.tabs(
                 [
                     "Expected Team",
                     "True Ideal Team",
@@ -4264,98 +4271,115 @@ with tab_ideal:
                 "ideal_pool",
                 pd.DataFrame()
             )
-        
-            with detail_tabs[0]:
+
+            with tab_expected_team:
 
                 st.markdown("#### Expected Team")
 
                 if not expected_team_df.empty:
+
                     st.dataframe(
                         expected_team_df,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Expected Team non salvato per questo torneo."
                     )
 
-            with detail_tabs[1]:
+            with tab_true_ideal_team:
 
                 st.markdown("#### True Ideal Team")
 
                 if not true_ideal_team_df.empty:
+
                     st.dataframe(
                         true_ideal_team_df,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "True Ideal Team non salvato per questo torneo."
                     )
 
-            with detail_tabs[2]:
+            with tab_actual_pool:
 
                 st.markdown("#### Actual Pool")
 
                 if not actual_pool_df.empty:
+
                     st.dataframe(
                         actual_pool_df,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Actual Pool non salvato per questo torneo."
                     )
 
-            with detail_tabs[3]:
+            with tab_missed_players:
 
                 st.markdown("#### Missed Players")
 
                 if not missed_df_hist.empty:
+
                     st.dataframe(
                         missed_df_hist,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Missed Players non salvati per questo torneo."
                     )
 
-            with detail_tabs[4]:
+            with tab_selected_not_ideal:
 
                 st.markdown("#### Selected Not Ideal")
 
                 if not selected_not_ideal_df_hist.empty:
+
                     st.dataframe(
                         selected_not_ideal_df_hist,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Selected Not Ideal non salvato per questo torneo."
                     )
 
-            with detail_tabs[5]:
+            with tab_ideal_pool:
 
                 st.markdown("#### Ideal Pool")
 
                 if not ideal_pool_df_hist.empty:
+
                     st.dataframe(
                         ideal_pool_df_hist,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Ideal Pool non salvato per questo torneo."
-                    )        
+                    )
 
-                
         else:
 
             st.info(
