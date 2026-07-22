@@ -4236,25 +4236,29 @@ with tab_ideal:
             )
 
             with detail_tabsexpected_team_df = historical_artifacts.get(
-                    "expected_team",
-                    pd.DataFrame()
+                "expected_team",
+                pd.DataFrame()
+            )
+
+            if not expected_team_df.empty:
+
+                st.dataframe(
+                    expected_team_df,
+                    use_container_width=True,
+                    hide_index=True
                 )
 
-                if not expected_team_df.empty:
+            else:
 
-                    st.dataframe(
-                        expected_team_df,
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-                else:
-
-                    st.info(
-                        "Expected Team non salvato per questo torneo."
+                st.info(
+                    "Expected Team non salvato per questo torneo."
+                )"Expected Team non salvato per questo torneo."
                     )
 
             with detail_tabstrue_ideal_team_df = historical_artifacts.get(
+                "true_ideal_team",
+                pd.DataFrame()
+            )
                     "true_ideal_team",
                     pd.DataFrame()
                 )
@@ -4274,9 +4278,9 @@ with tab_ideal:
                     )
 
             with detail_tabsactual_pool_df = historical_artifacts.get(
-                    "actual_pool",
-                    pd.DataFrame()
-                )
+                "actual_pool",
+                pd.DataFrame()
+            )
 
                 if not actual_pool_df.empty:
 
@@ -4293,8 +4297,8 @@ with tab_ideal:
                     )
 
             with detail_tabsmissed_df_hist = historical_artifacts.get(
-                    "missed_true_ideal_players",
-                    pd.DataFrame()
+                "missed_true_ideal_players",
+                pd.DataFrame()
                 )
 
                 if not missed_df_hist.empty:
@@ -4312,9 +4316,9 @@ with tab_ideal:
                     )
 
             with detail_tabsselected_not_ideal_df_hist = historical_artifacts.get(
-                    "selected_not_ideal_players",
-                    pd.DataFrame()
-                )
+                "selected_not_ideal_players",
+                pd.DataFrame()
+            )        
 
                 if not selected_not_ideal_df_hist.empty:
 
@@ -4331,9 +4335,9 @@ with tab_ideal:
                     )
 
             with detail_tabsideal_pool_df_hist = historical_artifacts.get(
-                    "ideal_pool",
-                    pd.DataFrame()
-                )
+                "ideal_pool",
+                pd.DataFrame()
+            )
 
                 if not ideal_pool_df_hist.empty:
 
