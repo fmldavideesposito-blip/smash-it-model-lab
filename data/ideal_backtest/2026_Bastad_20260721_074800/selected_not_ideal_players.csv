@@ -1,6 +1,7 @@
-﻿player;credits;expected_points;rank_v13;seed;entry;real_draw_size;draw_size;bracket_size;r1_match;overall_elo;selected_surface_elo;peak_elo;recent_form;surface_form_60d;same_surface_ratio_60d;fatigue_load;minutes_30d;qualifier_momentum_raw;local_home_raw;matches_in_db;player_norm;actual_wins;actual_points;actual_matches_in_tournament
-ARTHUR FILS;11,4;46,54;1;;;64;64;64;8;2020,6;1955,1;2051,0;0,0;0,0;0,0;-0,3;0,0;0,0;0,0;133;arthur fils;0;0,0;27
-FLAVIO COBOLLI;11,7;42,77;3;;;64;64;64;25;1896,3;1862,4;1914,6;0,0;0,0;0,0;-0,3;0,0;0,0;1,0;175;flavio cobolli;0;0,0;27
-JOAO FONSECA;10,8;36,12;8;;;64;64;64;20;1927,6;1856,3;1992,5;0,0;0,0;0,0;-0,3;0,0;0,0;0,0;143;joao fonseca;0;0,0;27
-TOMAS MARTIN ETCHEVERRY;6,2;34,41;9;;;64;64;64;21;1826,7;1774,5;1871,7;0,0;0,0;0,0;-0,3;0,0;0,0;0,0;160;tomas martin etcheverry;0;0,0;27
-MARIN CILIC;4,0;30,86;16;;;64;64;64;23;1800,4;1701,2;2100,4;0,0;0,0;0,0;-0,3;0,0;0,0;0,0;92;marin cilic;0;0,0;27
+﻿player;credits;expected_points;rank_v13;seed;entry;ioc;real_draw_size;draw_size;bracket_size;r1_match;overall_elo;selected_surface_elo;peak_elo;recent_form;surface_form_60d;same_surface_ratio_60d;fatigue_load;minutes_30d;qualifier_momentum_raw;local_home_raw;matches_in_db;player_norm;actual_wins;actual_points;actual_matches_in_tournament
+Alex De Minaur;17,8;83,39;4;5,0;;AUS;128;128;128;33;1961,0;1833,9;2053,1;0,6666666666666666;0,7142857142857143;0,4666666666666667;1,0026136443853797;829,0;0,0499999999999999;0,0;385;alex de minaur;0;0,0;27
+Frances Tiafoe;10,6;70,77;8;17,0;;USA;128;128;128;53;1918,1;1823,4;1974,0;0,8333333333333334;0,875;0,5;2,0945648771761363;1636,0;0,1;0,0;340;frances tiafoe;0;0,0;27
+Learner Tien;8,2;68,25;9;16,0;;USA;128;128;128;24;1941,1;1711,3;1977,4;0,75;0,5;0,1666666666666666;0,7301985301028082;680,0;0,0;0,0;161;learner tien;0;0,0;27
+Rafael Jodar;6,5;65,49;11;23,0;;ESP;128;128;128;5;1998,6;1699,3;2014,0;0,75;0,0;0,0;0,1539283419813834;831,0;0,0;0,0;94;rafael jodar;0;0,0;27
+Brandon Nakashima;7,7;56,95;18;28,0;;USA;128;128;128;13;1839,0;1756,7;1909,5;0,5833333333333334;0,75;0,4444444444444444;1,3347736174375684;910,0;0,075;0,0;373;brandon nakashima;0;0,0;27
+Cameron Norrie;7,0;50,76;20;26,0;;GBR;128;128;128;20;1828,8;1719,3;2028,6;0,4166666666666667;0,0;0,1666666666666666;-0,075483980619556;171,0;-0,15;1,0;360;cameron norrie;0;0,0;27
