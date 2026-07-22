@@ -4222,30 +4222,167 @@ with tab_ideal:
             for df in historical_artifacts.values()
         )
 
-        if has_any_artifact:
+                if has_any_artifact:
 
-            st.error(
-                "DAVIDE TEST 123"
+            detail_tabs = st.tabs(
+                [
+                    "Expected Team",
+                    "True Ideal Team",
+                    "Actual Pool",
+                    "Missed Players",
+                    "Selected Not Ideal",
+                    "Ideal Pool"
+                ]
+            )
+
+            with detail_tabsexpected_team_df = historical_artifacts.get(
+                    "expected_team",
+                    pd.DataFrame()
+                )
+
+                st.markdown(
+                    "#### Expected Team"
+                )
+
+                if not expected_team_df.empty:
+
+                    st.dataframe(
+                        expected_team_df,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                else:
+
+                    st.info(
+                        "Expected Team non salvato per questo torneo."
+                    )
+
+            with detail_tabstrue_ideal_team_df = historical_artifacts.get(
+                    "true_ideal_team",
+                    pd.DataFrame()
+                )
+
+                st.markdown(
+                    "#### True Ideal Team"
+                )
+
+                if not true_ideal_team_df.empty:
+
+                    st.dataframe(
+                        true_ideal_team_df,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                else:
+
+                    st.info(
+                        "True Ideal Team non salvato per questo torneo."
+                    )
+
+            with detail_tabsactual_pool_df = historical_artifacts.get(
+                    "actual_pool",
+                    pd.DataFrame()
+                )
+
+                st.markdown(
+                    "#### Actual Pool"
+                )
+
+                if not actual_pool_df.empty:
+
+                    st.dataframe(
+                        actual_pool_df,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                else:
+
+                    st.info(
+                        "Actual Pool non salvato per questo torneo."
+                    )
+
+            with detail_tabsmissed_df_hist = historical_artifacts.get(
+                    "missed_true_ideal_players",
+                    pd.DataFrame()
+                )
+
+                st.markdown(
+                    "#### Missed Players"
+                )
+
+                if not missed_df_hist.empty:
+
+                    st.dataframe(
+                        missed_df_hist,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                else:
+
+                    st.info(
+                        "Missed Players non salvati per questo torneo."
+                    )
+
+            with detail_tabsselected_not_ideal_df_hist = historical_artifacts.get(
+                    "selected_not_ideal_players",
+                    pd.DataFrame()
+                )
+
+                st.markdown(
+                    "#### Selected Not Ideal"
+                )
+
+                if not selected_not_ideal_df_hist.empty:
+
+                    st.dataframe(
+                        selected_not_ideal_df_hist,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                else:
+
+                    st.info(
+                        "Selected Not Ideal non salvato per questo torneo."
+                    )
+
+            with detail_tabsideal_pool_df_hist = historical_artifacts.get(
+                    "ideal_pool",
+                    pd.DataFrame()
+                )
+
+                st.markdown(
+                    "#### Ideal Pool"
+                )
+
+                if not ideal_pool_df_hist.empty:
+
+                    st.dataframe(
+                        ideal_pool_df_hist,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                else:
+
+                    st.info(
+                        "Ideal Pool non salvato per questo torneo."
+                    )
+
+        else:
+
+            st.info(
+                "Questo torneo è stato analizzato prima "
+                "dell'introduzione del salvataggio degli artifact dettagliati."
             )
 
             st.write(
-                "EXPECTED TEAM TYPE:",
-                type(
-                    historical_artifacts["expected_team"]
-                )
-            )
-
-            st.write(
-                "EXPECTED TEAM ROWS:",
-                len(
-                    historical_artifacts["expected_team"]
-                )
-            )
-
-            st.dataframe(
-                historical_artifacts["expected_team"],
-                use_container_width=True,
-                hide_index=True
+                "Run ID:",
+                selected_history_run_id
             )
 
         else:
