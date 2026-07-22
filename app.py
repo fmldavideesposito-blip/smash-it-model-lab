@@ -4224,8 +4224,8 @@ with tab_ideal:
 
         if has_any_artifact:
 
-            st.success(
-                "Historical artifacts found for this tournament."
+            st.error(
+                "DAVIDE TEST 123"
             )
 
             st.write(
