@@ -4232,6 +4232,10 @@ with tab_ideal:
                 list(historical_artifacts.keys())
             )
 
+            st.dataframe(
+                historical_artifacts["expected_team"]
+            )
+
         else:
 
             st.info(
