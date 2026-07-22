@@ -4234,6 +4234,36 @@ with tab_ideal:
                     "Ideal Pool"
                 ]
             )
+
+            expected_team_df = historical_artifacts.get(
+                "expected_team",
+                pd.DataFrame()
+            )
+
+            true_ideal_team_df = historical_artifacts.get(
+                "true_ideal_team",
+                pd.DataFrame()
+            )
+
+            actual_pool_df = historical_artifacts.get(
+                "actual_pool",
+                pd.DataFrame()
+            )
+
+            missed_df_hist = historical_artifacts.get(
+                "missed_true_ideal_players",
+                pd.DataFrame()
+            )
+
+            selected_not_ideal_df_hist = historical_artifacts.get(
+                "selected_not_ideal_players",
+                pd.DataFrame()
+            )
+
+            ideal_pool_df_hist = historical_artifacts.get(
+                "ideal_pool",
+                pd.DataFrame()
+            )
         
             with detail_tabs[0]:
 
