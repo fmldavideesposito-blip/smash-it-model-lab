@@ -4217,7 +4217,7 @@ with tab_ideal:
             selected_history_run_id
         )
 
-                has_any_artifact = any(
+        has_any_artifact = any(
             isinstance(df, pd.DataFrame) and not df.empty
             for df in historical_artifacts.values()
         )
