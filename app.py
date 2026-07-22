@@ -4235,14 +4235,12 @@ with tab_ideal:
                 ]
             )
 
-            with detail_tabsexpected_team_df = historical_artifacts.get(
+                        with detail_tabsexpected_team_df = historical_artifacts.get(
                     "expected_team",
                     pd.DataFrame()
                 )
 
-                st.markdown(
-                    "#### Expected Team"
-                )
+                st.markdown("#### Expected Team")
 
                 if not expected_team_df.empty:
 
@@ -4263,9 +4261,7 @@ with tab_ideal:
                     pd.DataFrame()
                 )
 
-                st.markdown(
-                    "#### True Ideal Team"
-                )
+                st.markdown("#### True Ideal Team")
 
                 if not true_ideal_team_df.empty:
 
@@ -4286,9 +4282,7 @@ with tab_ideal:
                     pd.DataFrame()
                 )
 
-                st.markdown(
-                    "#### Actual Pool"
-                )
+                st.markdown("#### Actual Pool")
 
                 if not actual_pool_df.empty:
 
@@ -4309,9 +4303,7 @@ with tab_ideal:
                     pd.DataFrame()
                 )
 
-                st.markdown(
-                    "#### Missed Players"
-                )
+                st.markdown("#### Missed Players")
 
                 if not missed_df_hist.empty:
 
@@ -4332,9 +4324,7 @@ with tab_ideal:
                     pd.DataFrame()
                 )
 
-                st.markdown(
-                    "#### Selected Not Ideal"
-                )
+                st.markdown("#### Selected Not Ideal")
 
                 if not selected_not_ideal_df_hist.empty:
 
@@ -4355,9 +4345,7 @@ with tab_ideal:
                     pd.DataFrame()
                 )
 
-                st.markdown(
-                    "#### Ideal Pool"
-                )
+                st.markdown("#### Ideal Pool")
 
                 if not ideal_pool_df_hist.empty:
 
@@ -4384,7 +4372,7 @@ with tab_ideal:
                 "Run ID:",
                 selected_history_run_id
             )
-        
+            
     # ----------------------------------------------------
     # Analyze New Tournament
     # ----------------------------------------------------
