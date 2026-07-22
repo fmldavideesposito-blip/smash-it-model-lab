@@ -4222,7 +4222,7 @@ with tab_ideal:
             for df in historical_artifacts.values()
         )
 
-                if has_any_artifact:
+        if has_any_artifact:
 
             detail_tabs = st.tabs(
                 [
