@@ -1,6 +1,5 @@
 ﻿run_id;tournament;year;budget;team_size;expected_team_actual_points;true_ideal_points;gap_vs_true_ideal;capture_rate_pct;expected_team_credits;true_ideal_credits;overlap_players;overlap_count
 2026_Eastbourne_20260626_061912;Eastbourne;2026;50;6;200,0;450,0;250,0;44,4;20,3;18,5;JACK DRAPER, UGO HUMBERT;2
-2026_Wimbledon_20260629_112643;Wimbledon;2026;110;8;400,0;925,0;525,0;43,2;108,5;108,4;Jannik Sinner;1
 2026_Kitzbuhel_20260719_063943;Kitzbuhel;2026;44;6;0,0;0,0;0,0;0,0;30,6;30,6;Alexander Bublik, Ignacio Buse, Juan Manuel Cerundolo, Mariano Navone, Raphael Collignon, Yannick Hanfmann;6
 2026_Roland_Garros_20260625_120010;Roland Garros;2026;80;8;375,0;450,0;75,0;83,3;44,0;38,5;Alejandro Tabilo, Alexander Blockx, Andrey Rublev, Jaime Faria, Nuno Borges, Pablo Carreno Busta;6
 2026_Gstaad_20260711_155415;Gstaad;2026;60;6;225,0;400,0;175,0;56,2;49,0;41,6;Casper Ruud, Juan Manuel Cerundolo, Raphael Collignon;3
@@ -8,4 +7,5 @@
 2026_Roma_20260625_110538;Roma;2026;80;8;425,0;725,0;300,0;58,6;79,0;78,9;CASPER RUUD, JANNIK SINNER, RAFAEL JODAR;3
 2026_Madrid_20260625_114018;Madrid;2026;80;8;575,0;725,0;150,0;79,3;79,0;78,6;ALEXANDER BLOCKX, JANNIK SINNER, RAFAEL JODAR;3
 2026_Estoril_20260720_164631;Estoril;2026;44;6;0,0;0,0;0,0;0,0;40,5;40,5;Alejandro Tabilo, Alexander Blockx, Andrey Rublev, Luciano Darderi, Nuno Borges, Pablo Carreno Busta;6
-2026_Bastad_20260721_074800;Bastad;2026;60;6;0,0;400,0;400,0;0,0;57,8;39,0;;0
+2026_Bastad_20260721_074800;Bastad;2026;60;6;325,0;400,0;75,0;81,2;39,7;37,9;Alejandro Tabilo, Andrey Rublev, Luciano Darderi, Nuno Borges, Sebastian Baez;5
+2026_Wimbledon_20260629_112643;Wimbledon;2026;110;8;400,0;925,0;525,0;43,2;108,5;108,4;Jannik Sinner;1
