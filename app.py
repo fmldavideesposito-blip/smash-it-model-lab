@@ -4116,24 +4116,6 @@ with tab_ideal:
 
     st.subheader("🏆 Ideal Team Backtest")
 
-    capture_history_df = load_capture_history()
-
-    if not capture_history_df.empty:
-
-        st.markdown(
-            "### Existing Tournament History"
-        )
-
-        st.dataframe(
-            capture_history_df,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        st.info(
-            "Carica un ranking_completo.csv solo per analizzare un NUOVO torneo, se ne carichi già esistente questo verrà sostituito dal nuovo ."
-        )   
-    
     # ----------------------------------------------------
     # Existing Tournament Navigation
     # ----------------------------------------------------
@@ -4148,6 +4130,7 @@ with tab_ideal:
         capture_history_display_df = capture_history_df.copy()
 
         if "capture_rate_pct" in capture_history_display_df.columns:
+
             capture_history_display_df["capture_rate_pct"] = pd.to_numeric(
                 capture_history_display_df["capture_rate_pct"],
                 errors="coerce"
@@ -4165,17 +4148,23 @@ with tab_ideal:
         )
 
         st.info(
-            "Puoi navigare i tornei già analizzati oppure caricare un ranking_completo.csv per analizzare un nuovo torneo."
+            "Puoi navigare i tornei già analizzati oppure caricare un ranking_completo.csv per analizzare un nuovo torneo. "
+            "Se ricarichi un torneo già esistente, il risultato storico verrà aggiornato."
         )
 
         history_labels_df = capture_history_df.copy()
+
+        history_labels_df["capture_rate_pct"] = pd.to_numeric(
+            history_labels_df["capture_rate_pct"],
+            errors="coerce"
+        )
 
         history_labels_df["history_label"] = (
             history_labels_df["tournament"].astype(str)
             + " "
             + history_labels_df["year"].astype(str)
             + " | Capture "
-            + history_labels_df["capture_rate_pct"].astype(str)
+            + history_labels_df["capture_rate_pct"].round(1).astype(str)
             + "%"
             + " | Run "
             + history_labels_df["run_id"].astype(str)
@@ -4209,7 +4198,7 @@ with tab_ideal:
         with h2:
             st.metric(
                 "Capture Rate",
-                f"{selected_history_row['capture_rate_pct']}%"
+                f"{selected_history_row['capture_rate_pct']:.1f}%"
             )
 
         with h3:
@@ -4228,7 +4217,7 @@ with tab_ideal:
             selected_history_run_id
         )
 
-        has_any_artifact = any(
+                has_any_artifact = any(
             isinstance(df, pd.DataFrame) and not df.empty
             for df in historical_artifacts.values()
         )
@@ -4246,92 +4235,116 @@ with tab_ideal:
                 ]
             )
 
-            with detail_tabsexpected_team_df = historical_artifacts[
-                    "expected_team"
-                ]
+            with detail_tabsexpected_team_df = historical_artifacts.get(
+                    "expected_team",
+                    pd.DataFrame()
+                )
 
                 if not expected_team_df.empty:
+
                     st.dataframe(
                         expected_team_df,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Expected Team non salvato per questo torneo."
                     )
 
-            with detail_tabstrue_ideal_team_df = historical_artifacts[
-                    "true_ideal_team"
-                ]
+            with detail_tabstrue_ideal_team_df = historical_artifacts.get(
+                    "true_ideal_team",
+                    pd.DataFrame()
+                )
 
                 if not true_ideal_team_df.empty:
+
                     st.dataframe(
                         true_ideal_team_df,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "True Ideal Team non salvato per questo torneo."
                     )
 
-            with detail_tabsactual_pool_df = historical_artifacts[
-                    "actual_pool"
-                ]
+            with detail_tabsactual_pool_df = historical_artifacts.get(
+                    "actual_pool",
+                    pd.DataFrame()
+                )
 
                 if not actual_pool_df.empty:
+
                     st.dataframe(
                         actual_pool_df,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Actual Pool non salvato per questo torneo."
                     )
 
-            with detail_tabsmissed_df_hist = historical_artifacts[
-                    "missed_true_ideal_players"
-                ]
+            with detail_tabsmissed_df_hist = historical_artifacts.get(
+                    "missed_true_ideal_players",
+                    pd.DataFrame()
+                )
 
                 if not missed_df_hist.empty:
+
                     st.dataframe(
                         missed_df_hist,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Missed Players non salvati per questo torneo."
                     )
 
-            with detail_tabsselected_not_ideal_df_hist = historical_artifacts[
-                    "selected_not_ideal_players"
-                ]
+            with detail_tabsselected_not_ideal_df_hist = historical_artifacts.get(
+                    "selected_not_ideal_players",
+                    pd.DataFrame()
+                )
 
                 if not selected_not_ideal_df_hist.empty:
+
                     st.dataframe(
                         selected_not_ideal_df_hist,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Selected Not Ideal non salvato per questo torneo."
                     )
 
-            with detail_tabsideal_pool_df_hist = historical_artifacts[
-                    "ideal_pool"
-                ]
+            with detail_tabsideal_pool_df_hist = historical_artifacts.get(
+                    "ideal_pool",
+                    pd.DataFrame()
+                )
 
                 if not ideal_pool_df_hist.empty:
+
                     st.dataframe(
                         ideal_pool_df_hist,
                         use_container_width=True,
                         hide_index=True
                     )
+
                 else:
+
                     st.info(
                         "Ideal Pool non salvato per questo torneo."
                     )
@@ -4343,17 +4356,19 @@ with tab_ideal:
                 "I dettagli non erano ancora salvati su GitHub quando il torneo è stato analizzato. "
                 "Ricarica una volta il ranking_completo.csv del torneo per generare gli artifact dettagliati."
             )
-
     else:
 
         st.info(
             "Nessun torneo storico disponibile. Carica un ranking_completo.csv per creare il primo backtest."
         )
 
+    # ----------------------------------------------------
+    # Analyze New Tournament
+    # ----------------------------------------------------
     st.markdown(
         "### Analyze New Tournament"
-    ) 
-    
+    )
+
     ranking_file = st.file_uploader(
         "Carica ranking_completo.csv",
         type=["csv"],
