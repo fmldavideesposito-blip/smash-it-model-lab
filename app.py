@@ -4228,8 +4228,12 @@ with tab_ideal:
                 "Historical artifacts found for this tournament."
             )
 
-            st.write(
-                list(historical_artifacts.keys())
+            st.subheader("Expected Team")
+
+            st.dataframe(
+                historical_artifacts["expected_team"],
+                use_container_width=True,
+                hide_index=True
             )
 
             st.dataframe(
