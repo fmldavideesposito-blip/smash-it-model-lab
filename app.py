@@ -409,14 +409,30 @@ def load_capture_history():
 
 def save_capture_history(df):
 
-    upload_csv_to_github(
-        df=df,
-        path="data/capture_rate_history.csv",
-        commit_message=(
-            f"Update Capture Rate History "
-            f"{pd.Timestamp.now()}"
+    try:
+
+        upload_csv_to_github(
+            df=df,
+            path="data/capture_rate_history.csv",
+            commit_message=(
+                f"Update Capture Rate History "
+                f"{pd.Timestamp.now()}"
+            )
         )
-    )
+
+        return True
+
+    except Exception as e:
+
+        st.warning(
+            "Capture Rate History non salvato su GitHub."
+        )
+
+        st.write(
+            str(e)
+        )
+
+        return False
 
 def load_prediction_master():
 
@@ -5264,9 +5280,27 @@ with tab_ideal:
             keep="last"
         )
 
-        save_capture_history(
-            capture_history_df
-        )
+        if st.button(
+            "💾 Save Capture Rate History to GitHub",
+            key=f"save_capture_history_{selected_run}"
+        ):
+
+            capture_saved = save_capture_history(
+                capture_history_df
+            )
+
+            if capture_saved:
+
+                st.success(
+                    "Capture Rate History salvato su GitHub."
+                )
+
+        else:
+
+            st.info(
+                "Capture Rate History calcolato. Premi il pulsante per salvarlo su GitHub."
+            )
+        
         st.markdown(
             "#### Capture Rate History"
         )
