@@ -1306,27 +1306,70 @@ def build_tournament_mapping(pred_df, actual_df):
 # ------------------------------------------------------------
 # Player Matching between Predictions and Actuals
 # ------------------------------------------------------------
+
 def normalize_player_name(name):
     """
-    Normalizza il nome player per confronti robusti.
+    Normalizza il nome player per confronti robusti:
+    - minuscolo
+    - rimozione accenti
+    - conversione spazi speciali / non-breaking spaces
+    - rimozione punteggiatura non significativa
+    - compressione spazi multipli
     """
 
     if pd.isna(name):
         return ""
 
-    name = str(name).lower().strip()
+    name = str(name)
+
+    name = unicodedata.normalize(
+        "NFKC",
+        name
+    )
+
+    name = (
+        name
+        .replace("\u00a0", " ")
+        .replace("\u200b", " ")
+        .replace("\ufeff", " ")
+    )
+
+    name = unicodedata.normalize(
+        "NFKD",
+        name
+    ).encode(
+        "ascii",
+        "ignore"
+    ).decode(
+        "ascii"
+    )
+
+    name = name.lower().strip()
 
     replacements = {
         "-": " ",
         ".": "",
         "'": "",
         "’": "",
+        "`": "",
+        "´": "",
     }
 
     for old, new in replacements.items():
-        name = name.replace(old, new)
+        name = name.replace(
+            old,
+            new
+        )
 
-    name = " ".join(name.split())
+    name = re.sub(
+        r"[^a-z0-9 ]+",
+        " ",
+        name
+    )
+
+    name = " ".join(
+        name.split()
+    )
 
     return name
 
@@ -1337,6 +1380,12 @@ def build_predicted_players_actual_match(
 ):
     """
     Cerca tutti i player del Prediction Warehouse negli actual TennisMyLife.
+
+    Correzioni:
+    - deduplica i predicted players usando player_norm;
+    - evita doppioni maiuscolo/minuscolo;
+    - gestisce spazi non standard;
+    - supporta alias per casi come Daniel Merida Aguilar / Daniel Merida.
     """
 
     if "player" not in pred_df.columns:
@@ -1345,43 +1394,120 @@ def build_predicted_players_actual_match(
     if "winner_name" not in actual_df.columns:
         return pd.DataFrame(), pd.DataFrame()
 
-    pred_players = (
-        pred_df["player"]
+    pred_players_df = (
+        pred_df[
+            [
+                "player"
+            ]
+        ]
         .dropna()
-        .astype(str)
-        .drop_duplicates()
-        .sort_values()
-        .tolist()
+        .copy()
     )
 
-    actual_wins = build_actual_player_wins(actual_df)
+    pred_players_df["predicted_player_raw"] = (
+        pred_players_df["player"]
+        .astype(str)
+        .str.strip()
+    )
+
+    pred_players_df["player_norm"] = (
+        pred_players_df["predicted_player_raw"]
+        .apply(
+            normalize_player_name
+        )
+    )
+
+    pred_players_df = pred_players_df[
+        pred_players_df["player_norm"] != ""
+    ].copy()
+
+    # ----------------------------------------------------
+    # Preferisce la forma non tutta maiuscola quando esistono doppioni
+    # es. ALEJANDRO TABILO vs Alejandro Tabilo
+    # ----------------------------------------------------
+    pred_players_df["is_upper_style"] = (
+        pred_players_df["predicted_player_raw"]
+        .apply(
+            lambda x: str(x).upper() == str(x)
+        )
+    )
+
+    pred_players_df = (
+        pred_players_df
+        .sort_values(
+            [
+                "player_norm",
+                "is_upper_style",
+                "predicted_player_raw"
+            ],
+            ascending=[
+                True,
+                True,
+                True
+            ]
+        )
+        .drop_duplicates(
+            subset=[
+                "player_norm"
+            ],
+            keep="first"
+        )
+        .reset_index(drop=True)
+    )
+
+    actual_wins = build_actual_player_wins(
+        actual_df
+    )
 
     if actual_wins.empty:
         return pd.DataFrame(), pd.DataFrame()
 
     actual_wins = actual_wins.copy()
 
-    actual_wins["player_norm"] = actual_wins["player"].apply(
-        normalize_player_name
+    actual_wins["player_norm"] = (
+        actual_wins["player"]
+        .apply(
+            normalize_player_name
+        )
     )
 
     rows = []
 
-    for player in pred_players:
+    for _, pred_row in pred_players_df.iterrows():
 
-        player_norm = normalize_player_name(player)
+        player = pred_row["predicted_player_raw"]
+        player_norm = pred_row["player_norm"]
+
+        lookup_keys = get_player_lookup_keys(
+            player_norm
+        )
 
         matched = actual_wins[
-            actual_wins["player_norm"] == player_norm
+            actual_wins["player_norm"].isin(
+                lookup_keys
+            )
         ].copy()
 
         if not matched.empty:
+
+            matched = matched.sort_values(
+                [
+                    "actual_points",
+                    "wins"
+                ],
+                ascending=[
+                    False,
+                    False
+                ]
+            )
 
             row = matched.iloc[0].to_dict()
 
             rows.append(
                 {
                     "predicted_player": player,
+                    "predicted_player_norm": player_norm,
+                    "lookup_keys": ", ".join(lookup_keys),
                     "matched_actual_player": row.get("player", ""),
                     "found_in_actuals": True,
                     "wins": row.get("wins", 0),
@@ -1400,6 +1526,8 @@ def build_predicted_players_actual_match(
             rows.append(
                 {
                     "predicted_player": player,
+                    "predicted_player_norm": player_norm,
+                    "lookup_keys": ", ".join(lookup_keys),
                     "matched_actual_player": "",
                     "found_in_actuals": False,
                     "wins": 0,
@@ -1410,17 +1538,21 @@ def build_predicted_players_actual_match(
                 }
             )
 
-    match_df = pd.DataFrame(rows)
+    match_df = pd.DataFrame(
+        rows
+    )
 
     unmatched_df = match_df[
         match_df["found_in_actuals"] == False
     ].copy()
 
-    match_df["tournaments_won_matches"] = pd.to_numeric(
-        match_df["tournaments_won_matches"],
-        errors="coerce"
-    ).fillna(0).astype(int)
-    
+    if "tournaments_won_matches" in match_df.columns:
+
+        match_df["tournaments_won_matches"] = pd.to_numeric(
+            match_df["tournaments_won_matches"],
+            errors="coerce"
+        ).fillna(0).astype(int)
+
     return match_df, unmatched_df
 
 # ------------------------------------------------------------
