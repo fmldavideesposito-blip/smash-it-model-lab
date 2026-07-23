@@ -5663,11 +5663,6 @@ with tab_ideal:
                     "Capture Rate History salvato su GitHub."
                 )
 
-        else:
-
-            st.info(
-                "Capture Rate History calcolato. Premi il pulsante per salvarlo su GitHub."
-            )
         
         st.markdown(
             "#### Capture Rate History"
