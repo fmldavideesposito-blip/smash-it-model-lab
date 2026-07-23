@@ -953,7 +953,9 @@ def build_prediction_vs_actual_global(
     if "expected_points" not in pred_df.columns:
         return pd.DataFrame()
 
-    actual_wins = build_actual_player_wins(actual_df)
+    actual_wins = build_actual_player_wins(
+        actual_df
+    )
 
     if actual_wins.empty:
         return pd.DataFrame()
@@ -961,42 +963,19 @@ def build_prediction_vs_actual_global(
     pred_norm = pred_df.copy()
 
     pred_norm["player_norm"] = (
-    pred_norm["player"]
-        .apply(normalize_player_name)
+        pred_norm["player"]
+        .apply(
+            normalize_player_name
+        )
     )
-
-    PLAYER_ALIAS_MAP = {
-    "daniel merida aguilar": [
-        "daniel merida aguilar",
-        "daniel merida"
-    ],
-}
-
-
-def get_player_lookup_keys(player_norm):
-    """
-    Restituisce tutte le chiavi normalizzate da usare per cercare un player
-    negli actual results.
-    """
-
-    aliases = PLAYER_ALIAS_MAP.get(
-        player_norm,
-        [
-            player_norm
-        ]
-    )
-
-    return [
-        normalize_player_name(alias)
-        for alias in aliases
-        if normalize_player_name(alias)
-    ]
 
     prediction_summary = (
         pred_norm
         .groupby(
-            ["player_norm"],
-           dropna=False
+            [
+                "player_norm"
+            ],
+            dropna=False
         )
         .agg(
             player=("player", "first"),
@@ -1006,21 +985,37 @@ def get_player_lookup_keys(player_norm):
         .reset_index()
     )
 
-    prediction_summary["player_norm"] = (
-        prediction_summary["player"]
-        .apply(normalize_player_name)
-        )
+    actual_wins = actual_wins.copy()
 
     actual_wins["player_norm"] = (
         actual_wins["player"]
-        .apply(normalize_player_name)
+        .apply(
+            normalize_player_name
+        )
+    )
+
+    actual_wins_norm = (
+        actual_wins
+        .groupby(
+            [
+                "player_norm"
+            ],
+            dropna=False
+        )
+        .agg(
+            actual_player=("player", "first"),
+            wins=("wins", "sum"),
+            actual_points=("actual_points", "sum")
+        )
+        .reset_index()
     )
 
     merged = pd.merge(
         prediction_summary,
-        actual_wins[
+        actual_wins_norm[
             [
                 "player_norm",
+                "actual_player",
                 "wins",
                 "actual_points"
             ]
@@ -1029,22 +1024,36 @@ def get_player_lookup_keys(player_norm):
         how="left"
     )
 
-    merged["wins"] = merged["wins"].fillna(0)
-    merged["actual_points"] = merged["actual_points"].fillna(0)
+    merged["wins"] = (
+        merged["wins"]
+        .fillna(0)
+    )
+
+    merged["actual_points"] = (
+        merged["actual_points"]
+        .fillna(0)
+    )
 
     merged["prediction_error"] = (
         merged["actual_points"]
-        - merged["expected_points"]
+        -
+        merged["expected_points"]
     )
 
     merged["efficiency_ratio"] = (
         merged["actual_points"]
-        / merged["expected_points"]
+        /
+        merged["expected_points"]
     )
 
     merged["efficiency_ratio"] = (
         merged["efficiency_ratio"]
-        .replace([float("inf")], 0)
+        .replace(
+            [
+                float("inf")
+            ],
+            0
+        )
         .fillna(0)
     )
 
@@ -1055,6 +1064,11 @@ def get_player_lookup_keys(player_norm):
 
     merged["expected_points"] = (
         merged["expected_points"]
+        .round(1)
+    )
+
+    merged["actual_points"] = (
+        merged["actual_points"]
         .round(1)
     )
 
@@ -1076,6 +1090,7 @@ def get_player_lookup_keys(player_norm):
 
     return merged
 
+
 def filter_actuals_by_tournament(
     actual_df: pd.DataFrame,
     tournament_filter: str
@@ -1094,7 +1109,6 @@ def filter_actuals_by_tournament(
         actual_df["tourney_name"].astype(str)
         == tournament_filter
     ].copy()
-
 
 # ------------------------------------------------------------
 # Tournament Mapping
@@ -1400,6 +1414,32 @@ def normalize_player_name(name):
 
     return name
 
+PLAYER_ALIAS_MAP = {
+    "daniel merida aguilar": [
+        "daniel merida aguilar",
+        "daniel merida"
+    ],
+}
+
+
+def get_player_lookup_keys(player_norm):
+    """
+    Restituisce tutte le chiavi normalizzate da usare per cercare un player
+    negli actual results.
+    """
+
+    aliases = PLAYER_ALIAS_MAP.get(
+        player_norm,
+        [
+            player_norm
+        ]
+    )
+
+    return [
+        normalize_player_name(alias)
+        for alias in aliases
+        if normalize_player_name(alias)
+    ]
 
 def build_predicted_players_actual_match(
     pred_df: pd.DataFrame,
@@ -3771,9 +3811,10 @@ with tab_backtest:
                 "predicted_player_norm"
             ].nunique()
 
-            matched_players = int(
-                player_match_df["found_in_actuals"].sum()
-            )
+            matched_players = player_match_df.loc[
+                player_match_df["found_in_actuals"] == True,
+                "predicted_player_norm"
+            ].nunique()
 
             player_match_rate = (
                 matched_players / total_predicted_players * 100
