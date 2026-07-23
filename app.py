@@ -5281,9 +5281,39 @@ with tab_ideal:
         )
 
         if st.button(
-            "💾 Save Capture Rate History to GitHub",
-            key=f"save_capture_history_{selected_run}"
+            "💾 Save Ideal Backtest History and Artifacts to GitHub",
+            key=f"save_full_ideal_backtest_{selected_run}"
         ):
+
+            capture_saved = save_capture_history(
+                capture_history_df
+            )
+
+            save_ideal_backtest_artifacts(
+                run_id=selected_run,
+                ideal_pool=ideal_pool,
+                ideal_team_df=ideal_team_df,
+                actual_pool=actual_pool,
+                actual_ideal_team_df=actual_ideal_team_df,
+                missed_df=missed_df,
+                selected_not_ideal_df=selected_not_ideal_df
+            )
+
+            if "prediction_log_master_enriched" in st.session_state:
+
+                del st.session_state[
+                    "prediction_log_master_enriched"
+                ]
+
+            st.success(
+                "Ideal Backtest History and detailed artifacts saved to GitHub."
+            )
+
+        else:
+
+            st.info(
+                "Ideal Backtest calcolato. Premi il pulsante per salvare storico e artifact dettagliati su GitHub."
+            )
 
             capture_saved = save_capture_history(
                 capture_history_df
