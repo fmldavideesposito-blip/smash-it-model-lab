@@ -534,26 +534,81 @@ def merge_prediction_log(
     replace_tournament=False
 ):
 
-    if master_df.empty:
-        return new_df.copy()
+    if new_df is None or new_df.empty:
+
+        return master_df.copy()
+
+    new_df = new_df.copy()
 
     tournament = (
-        new_df["tournament"].iloc[0]
+        str(
+            new_df["tournament"].iloc[0]
+        )
+        .strip()
     )
 
-    year = (
-        new_df["year"].iloc[0]
+    year = int(
+        pd.to_numeric(
+            new_df["year"].iloc[0],
+            errors="coerce"
+        )
     )
+
+    new_df["tournament"] = (
+        new_df["tournament"]
+        .astype(str)
+        .str.strip()
+    )
+
+    new_df["year"] = pd.to_numeric(
+        new_df["year"],
+        errors="coerce"
+    ).fillna(0).astype(int)
+
+    if master_df is None or master_df.empty:
+
+        return new_df.copy()
+
+    master_df = master_df.copy()
+
+    master_df["tournament"] = (
+        master_df["tournament"]
+        .astype(str)
+        .str.strip()
+    )
+
+    master_df["year"] = pd.to_numeric(
+        master_df["year"],
+        errors="coerce"
+    ).fillna(0).astype(int)
 
     if replace_tournament:
 
+        before_rows = len(
+            master_df
+        )
+
         master_df = master_df[
             ~(
-                (master_df["tournament"] == tournament)
+                (
+                    master_df["tournament"] == tournament
+                )
                 &
-                (master_df["year"] == year)
+                (
+                    master_df["year"] == year
+                )
             )
         ].copy()
+
+        removed_rows = (
+            before_rows
+            -
+            len(master_df)
+        )
+
+        st.info(
+            f"Replace Existing: rimosse {removed_rows} righe esistenti per {tournament} {year}."
+        )
 
     merged = pd.concat(
         [
@@ -2537,6 +2592,18 @@ with tab_summary:
                 "prediction_log_master"
             ] = master_df
 
+            if "prediction_log_master_enriched" in st.session_state:
+
+                del st.session_state[
+                    "prediction_log_master_enriched"
+                ]
+
+        else:
+
+            st.info(
+                "Nessuna modifica da salvare su GitHub."
+            )
+
             st.success(
                 f"Warehouse salvato su GitHub "
                 f"({len(master_df)} rows)"
@@ -2808,10 +2875,7 @@ with tab_summary:
             # ----------------------------------------------------
             st.markdown("### Full Prediction Warehouse")
 
-            display_master_df = st.session_state.get(
-                "prediction_log_master_enriched",
-                master_df
-            )
+            display_master_df = master_df
 
             st.dataframe(
                 display_master_df,
