@@ -2598,12 +2598,6 @@ with tab_summary:
                     "prediction_log_master_enriched"
                 ]
 
-        else:
-
-            st.info(
-                "Nessuna modifica da salvare su GitHub."
-            )
-
             st.success(
                 f"Warehouse salvato su GitHub "
                 f"({len(master_df)} rows)"
