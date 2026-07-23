@@ -1414,6 +1414,13 @@ def normalize_player_name(name):
 
     return name
 
+PLAYER_ALIAS_MAP = {
+    "daniel merida aguilar": [
+        "daniel merida aguilar",
+        "daniel merida"
+    ],
+}
+
 def get_player_lookup_keys(player_norm):
     """
     Restituisce tutte le chiavi normalizzate da usare per cercare un player
