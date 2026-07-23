@@ -3797,6 +3797,78 @@ with tab_backtest:
             actual_df
         )
 
+        # ----------------------------------------------------
+        # FORCE CLEAN PLAYER MATCH REPORT
+        # ----------------------------------------------------
+        if not player_match_df.empty:
+
+            # Se la funzione non ha ancora prodotto player_norm,
+            # lo creiamo qui comunque.
+            if "predicted_player_norm" not in player_match_df.columns:
+
+                player_match_df["predicted_player_norm"] = (
+                    player_match_df["predicted_player"]
+                    .apply(
+                        normalize_player_name
+                    )
+                )
+
+            # Se manca lookup_keys, lo creiamo qui.
+            if "lookup_keys" not in player_match_df.columns:
+
+                player_match_df["lookup_keys"] = (
+                    player_match_df["predicted_player_norm"]
+                    .apply(
+                        lambda x: ", ".join(
+                            get_player_lookup_keys(x)
+                        )
+                    )
+                )
+
+            # Flag per preferire la forma non tutta maiuscola.
+            player_match_df["is_upper_style"] = (
+                player_match_df["predicted_player"]
+                .astype(str)
+                .apply(
+                    lambda x: x.upper() == x
+                )
+            )
+
+            # Deduplica definitiva su predicted_player_norm.
+            # Esempio: DANIIL MEDVEDEV e Daniil Medvedev diventano una sola riga.
+            player_match_df = (
+                player_match_df
+                .sort_values(
+                    [
+                        "predicted_player_norm",
+                        "is_upper_style",
+                        "predicted_player"
+                    ],
+                    ascending=[
+                        True,
+                        True,
+                        True
+                    ]
+                )
+                .drop_duplicates(
+                    subset=[
+                        "predicted_player_norm"
+                    ],
+                    keep="first"
+                )
+                .drop(
+                    columns=[
+                        "is_upper_style"
+                    ],
+                    errors="ignore"
+                )
+                .reset_index(drop=True)
+            )
+
+            unmatched_players_df = player_match_df[
+                player_match_df["found_in_actuals"] == False
+            ].copy()
+
         if not player_match_df.empty:
 
             total_predicted_players = player_match_df[
