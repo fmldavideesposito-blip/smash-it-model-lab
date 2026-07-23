@@ -92,15 +92,28 @@ def upload_csv_to_github(
     path,
     commit_message
 ):
+    """
+    Upload robusto di un CSV su GitHub.
+    Se il file esiste già, recupera lo SHA aggiornato e lo sovrascrive.
+    Gestisce anche un retry in caso di conflitto.
+    """
 
-    csv_content = df.to_csv(
+    csv_buffer = io.StringIO()
+
+    df.to_csv(
+        csv_buffer,
+        index=False,
         sep=";",
-        decimal=",",
-        encoding="utf-8-sig",
-        index=False
+        decimal=","
     )
 
-    api_url = (
+    content = base64.b64encode(
+        csv_buffer
+        .getvalue()
+        .encode("utf-8-sig")
+    ).decode("utf-8")
+
+    url = (
         f"https://api.github.com/repos/"
         f"{GITHUB_OWNER}/"
         f"{GITHUB_REPO}/contents/"
@@ -112,34 +125,86 @@ def upload_csv_to_github(
         "Accept": "application/vnd.github+json"
     }
 
-    sha = None
+    branch = "main"
 
-    existing = requests.get(
-        api_url,
-        headers=headers
-    )
+    def get_existing_sha():
 
-    if existing.status_code == 200:
-        sha = existing.json()["sha"]
+        get_response = requests.get(
+            url,
+            headers=headers,
+            params={
+                "ref": branch
+            }
+        )
+
+        if get_response.status_code == 200:
+
+            return get_response.json().get(
+                "sha"
+            )
+
+        if get_response.status_code == 404:
+
+            return None
+
+        st.error(
+            f"Errore lettura file GitHub: {path}"
+        )
+
+        st.write(
+            get_response.text
+        )
+
+        get_response.raise_for_status()
+
+        return None
+
+    sha = get_existing_sha()
 
     payload = {
         "message": commit_message,
-        "content": base64.b64encode(
-            csv_content.encode("utf-8-sig")
-        ).decode("utf-8")
+        "content": content,
+        "branch": branch
     }
 
     if sha:
+
         payload["sha"] = sha
 
     response = requests.put(
-        api_url,
+        url,
         headers=headers,
         json=payload
     )
-    
-    response.raise_for_status()
 
+    if response.status_code == 409:
+
+        sha = get_existing_sha()
+
+        if sha:
+
+            payload["sha"] = sha
+
+        response = requests.put(
+            url,
+            headers=headers,
+            json=payload
+        )
+
+    if response.status_code not in [200, 201]:
+
+        st.error(
+            f"GitHub upload error {response.status_code} su {path}"
+        )
+
+        st.write(
+            response.text
+        )
+
+        response.raise_for_status()
+
+    return response.json()
+    
 def read_prediction_log(uploaded_file):
     """
     Legge il prediction_log.csv generato da Smash IT Optimizer.
@@ -189,13 +254,6 @@ ACTUAL_MASTER_FILE = (
 CAPTURE_HISTORY_FILE = (
     DATA_DIR / "capture_rate_history.csv"
 )
-
-def save_actual_master(df):
-
-    df.to_csv(
-        ACTUAL_MASTER_FILE,
-        ...
-    )
 
 def safe_artifact_key(value):
     """
@@ -2342,6 +2400,11 @@ with tab_summary:
                 master_df["player"]
                 .apply(normalize_player_name)
             )
+
+        warehouse_changed = False
+
+        
+        
         for f in uploaded_logs:
 
             try:
@@ -2369,13 +2432,33 @@ with tab_summary:
 
                 already_exists = False
 
+                tournament_name = df["tournament"].iloc[0]
+
+                year = int(
+                    pd.to_numeric(
+                        df["year"].iloc[0],
+                        errors="coerce"
+                    )
+                )
+
+                already_exists = False
+
                 if not master_df.empty:
 
-                 already_exists = len(
-                     master_df[
-                          (master_df["tournament"] == tournament_name)
+                    master_df["year"] = pd.to_numeric(
+                        master_df["year"],
+                        errors="coerce"
+                    ).fillna(0).astype(int)
+
+                    already_exists = len(
+                        master_df[
+                            (
+                                master_df["tournament"] == tournament_name
+                            )
                             &
-                            (master_df["year"] == year)
+                            (
+                                master_df["year"] == year
+                            )
                         ]
                     ) > 0
 
@@ -2407,9 +2490,11 @@ with tab_summary:
                         master_df,
                         df,
                         replace_tournament=(
-                        action == "Replace Existing"
+                            action == "Replace Existing"
                         )
                     )
+
+                    warehouse_changed = True
 
                 df = ensure_numeric(
                     df,
@@ -2442,9 +2527,26 @@ with tab_summary:
 
                 st.exception(e)
 
-        save_prediction_master(
-            master_df
-        )
+        if warehouse_changed:
+
+            save_prediction_master(
+                master_df
+            )
+
+            st.session_state[
+                "prediction_log_master"
+            ] = master_df
+
+            st.success(
+                f"Warehouse salvato su GitHub "
+                f"({len(master_df)} rows)"
+            )
+
+        else:
+
+            st.info(
+                "Nessuna modifica da salvare su GitHub."
+            )
 
         st.write(
             "TORNEI MASTER IN MEMORIA:"
@@ -2458,11 +2560,6 @@ with tab_summary:
                 .unique()
                 .tolist()
             )
-        )
-
-        st.success(
-            f"Warehouse salvato su GitHub "
-            f"({len(master_df)} rows)"
         )
         
         if all_logs:
