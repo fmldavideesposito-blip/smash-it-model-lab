@@ -1339,7 +1339,7 @@ def normalize_player_name(name):
     Normalizza il nome player per confronti robusti:
     - minuscolo
     - rimozione accenti
-    - conversione spazi speciali / non-breaking spaces
+    - conversione spazi speciali
     - rimozione punteggiatura non significativa
     - compressione spazi multipli
     """
@@ -1411,7 +1411,7 @@ def build_predicted_players_actual_match(
     Correzioni:
     - deduplica i predicted players usando player_norm;
     - evita doppioni maiuscolo/minuscolo;
-    - aggrega eventuali varianti anche negli actual winners;
+    - supporta alias per player con naming diverso;
     - aggiunge colonne debug predicted_player_norm e lookup_keys.
     """
 
@@ -1424,11 +1424,15 @@ def build_predicted_players_actual_match(
     # ----------------------------------------------------
     # Predicted players normalizzati
     # ----------------------------------------------------
-    pred_players_df = pred_df[
-        [
-            "player"
+    pred_players_df = (
+        pred_df[
+            [
+                "player"
+            ]
         ]
-    ].dropna().copy()
+        .dropna()
+        .copy()
+    )
 
     pred_players_df["predicted_player_raw"] = (
         pred_players_df["player"]
@@ -1447,8 +1451,6 @@ def build_predicted_players_actual_match(
         pred_players_df["player_norm"] != ""
     ].copy()
 
-    # Preferisce la forma non tutta maiuscola.
-    # Esempio: tiene "Daniil Medvedev" invece di "DANIIL MEDVEDEV".
     pred_players_df["is_upper_style"] = (
         pred_players_df["predicted_player_raw"]
         .apply(
@@ -1456,6 +1458,8 @@ def build_predicted_players_actual_match(
         )
     )
 
+    # Tiene una sola riga per player_norm.
+    # Preferisce la forma non tutta maiuscola.
     pred_players_df = (
         pred_players_df
         .sort_values(
@@ -1498,57 +1502,7 @@ def build_predicted_players_actual_match(
         )
     )
 
-    # Aggrega eventuali varianti dello stesso player negli actual.
-    # Esempio: "Alex de Minaur" / "Alex De Minaur".
-    agg_dict = {
-        "matched_actual_player": (
-            "player",
-            "first"
-        ),
-        "wins": (
-            "wins",
-            "sum"
-        ),
-        "actual_points": (
-            "actual_points",
-            "sum"
-        )
-    }
-
-    if "tournaments_won_matches" in actual_wins.columns:
-        agg_dict["tournaments_won_matches"] = (
-            "tournaments_won_matches",
-            "sum"
-        )
-
-    if "surfaces" in actual_wins.columns:
-        agg_dict["surfaces"] = (
-            "surfaces",
-            lambda x: ", ".join(
-                sorted(
-                    set(
-                        ", ".join(
-                            x.dropna().astype(str)
-                        ).split(", ")
-                    )
-                )
-            )
-        )
-
-    if "rounds_won" in actual_wins.columns:
-        agg_dict["rounds_won"] = (
-            "rounds_won",
-            lambda x: ", ".join(
-                sorted(
-                    set(
-                        ", ".join(
-                            x.dropna().astype(str)
-                        ).split(", ")
-                    )
-                )
-            )
-        )
-
+    # Aggrega eventuali varianti negli actual.
     actual_wins_norm = (
         actual_wins
         .groupby(
@@ -1556,7 +1510,37 @@ def build_predicted_players_actual_match(
             dropna=False
         )
         .agg(
-            **agg_dict
+            matched_actual_player=("player", "first"),
+            wins=("wins", "sum"),
+            actual_points=("actual_points", "sum"),
+            tournaments_won_matches=(
+                "tournaments_won_matches",
+                "sum"
+            ),
+            surfaces=(
+                "surfaces",
+                lambda x: ", ".join(
+                    sorted(
+                        set(
+                            ", ".join(
+                                x.dropna().astype(str)
+                            ).split(", ")
+                        )
+                    )
+                )
+            ),
+            rounds_won=(
+                "rounds_won",
+                lambda x: ", ".join(
+                    sorted(
+                        set(
+                            ", ".join(
+                                x.dropna().astype(str)
+                            ).split(", ")
+                        )
+                    )
+                )
+            )
         )
         .reset_index()
     )
@@ -1671,6 +1655,7 @@ def build_predicted_players_actual_match(
     ].copy()
 
     return match_df, unmatched_df
+
 # ------------------------------------------------------------
 # Prediction vs Actual by Tournament
 # ------------------------------------------------------------
@@ -3783,7 +3768,7 @@ with tab_backtest:
         if not player_match_df.empty:
 
             total_predicted_players = player_match_df[
-                "predicted_player"
+                "predicted_player_norm"
             ].nunique()
 
             matched_players = int(
