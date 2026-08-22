@@ -462,9 +462,15 @@ def save_prediction_master(df):
     )
 
 def load_actual_master():
+    """Carica gli actual persistenti da GitHub, con fallback locale."""
+    github_df = load_csv_from_github_optional(
+        "data/actual_results_master.csv"
+    )
+
+    if not github_df.empty:
+        return github_df
 
     if ACTUAL_MASTER_FILE.exists():
-
         try:
             return pd.read_csv(
                 ACTUAL_MASTER_FILE,
@@ -472,20 +478,26 @@ def load_actual_master():
                 decimal=",",
                 encoding="utf-8-sig"
             )
-
         except Exception:
             pass
 
     return pd.DataFrame()
 
-def save_actual_master(df):
 
+def save_actual_master(df):
+    """Salva gli actual sia localmente sia su GitHub."""
     df.to_csv(
         ACTUAL_MASTER_FILE,
         sep=";",
         decimal=",",
         encoding="utf-8-sig",
         index=False
+    )
+
+    upload_csv_to_github(
+        df=df,
+        path="data/actual_results_master.csv",
+        commit_message=f"Update Actual Results Master {pd.Timestamp.now()}"
     )
 
 
@@ -2397,136 +2409,85 @@ def build_actual_points_for_pool(
     actual_year=None,
     points_per_win=25
 ):
-    """
-    Arricchisce il pool del ranking_completo.csv con:
-    - actual_wins
-    - actual_points
-    - actual_matches_in_tournament
-
-    usando i risultati reali TennisMyLife.
-    """
-
+    """Abbina il ranking ai risultati reali del torneo e calcola i punti."""
     if pool_df is None or pool_df.empty:
         return pd.DataFrame()
 
-    if actual_df is None or actual_df.empty:
-        return pool_df.copy()
-
-    if "winner_name" not in actual_df.columns:
-        return pool_df.copy()
-
-    if "tourney_name" not in actual_df.columns:
-        return pool_df.copy()
-
     pool = pool_df.copy()
-    actual = actual_df.copy()
+    pool["player_norm"] = pool["player"].apply(normalize_player_name)
+    pool["actual_wins"] = 0
+    pool["actual_points"] = 0.0
+    pool["actual_matches_in_tournament"] = 0
 
-    pool["player_norm"] = (
-        pool["player"]
-        .apply(normalize_player_name)
-    )
-
-    actual["tourney_norm"] = (
-        actual["tourney_name"]
-        .apply(normalize_tournament_name)
-    )
-
-    run_tournament_norm = (
-        normalize_tournament_name(
-            actual_tournament
-        )
-    )
-
-    actual = actual[
-        actual["tourney_norm"]
-        == run_tournament_norm
-    ].copy()
-
-    if actual_year is not None and actual_year != "All Years":
-
-        if "source_year" in actual.columns:
-
-            actual["actual_year"] = pd.to_numeric(
-                actual["source_year"],
-                errors="coerce"
-            )
-
-        elif "tourney_date" in actual.columns:
-
-            actual["actual_year"] = pd.to_numeric(
-                actual["tourney_date"]
-                .astype(str)
-                .str.slice(0, 4),
-                errors="coerce"
-            )
-
-        else:
-
-            actual["actual_year"] = pd.NA
-
-        actual = actual[
-            actual["actual_year"] == int(actual_year)
-        ].copy()
-
-    if actual.empty:
-
-        pool["actual_wins"] = 0
-        pool["actual_points"] = 0
-        pool["actual_matches_in_tournament"] = 0
-
+    required_actual_cols = {"tourney_name", "winner_name"}
+    if actual_df is None or actual_df.empty:
+        return pool
+    if not required_actual_cols.issubset(actual_df.columns):
         return pool
 
-    actual["winner_norm"] = (
-        actual["winner_name"]
-        .apply(normalize_player_name)
+    actual = actual_df.copy()
+    actual["tourney_norm"] = actual["tourney_name"].apply(
+        normalize_tournament_name
     )
+    run_tournament_norm = normalize_tournament_name(actual_tournament)
+    actual = actual[actual["tourney_norm"] == run_tournament_norm].copy()
+
+    if actual_year is not None and str(actual_year) != "All Years":
+        requested_year = pd.to_numeric(actual_year, errors="coerce")
+        if "source_year" in actual.columns:
+            actual_year_series = pd.to_numeric(
+                actual["source_year"], errors="coerce"
+            )
+        elif "tourney_date" in actual.columns:
+            date_digits = (
+                actual["tourney_date"]
+                .astype(str)
+                .str.replace(r"\D", "", regex=True)
+            )
+            actual_year_series = pd.to_numeric(
+                date_digits.str[:4], errors="coerce"
+            )
+        else:
+            actual_year_series = pd.Series(
+                pd.NA, index=actual.index, dtype="Float64"
+            )
+
+        if pd.notna(requested_year):
+            actual = actual[
+                actual_year_series == int(requested_year)
+            ].copy()
+
+    if actual.empty:
+        return pool
+
+    actual["winner_norm"] = actual["winner_name"].apply(
+        normalize_player_name
+    )
+    actual = actual[actual["winner_norm"] != ""].copy()
 
     wins_df = (
-        actual
-        .groupby(
-            "winner_norm",
-            dropna=False
-        )
-        .agg(
-            actual_wins=("winner_name", "count")
-        )
+        actual.groupby("winner_norm", dropna=False)
+        .size()
+        .rename("actual_wins")
         .reset_index()
     )
-
     wins_df["actual_points"] = (
-        wins_df["actual_wins"]
-        * points_per_win
+        wins_df["actual_wins"] * float(points_per_win)
     )
 
-    pool = pool.merge(
+    pool = pool.drop(
+        columns=["actual_wins", "actual_points"], errors="ignore"
+    ).merge(
         wins_df,
         left_on="player_norm",
         right_on="winner_norm",
         how="left"
     )
-
-    pool["actual_wins"] = (
-        pool["actual_wins"]
-        .fillna(0)
-        .astype(int)
-    )
-
-    pool["actual_points"] = (
-        pool["actual_points"]
-        .fillna(0)
-        .astype(float)
-    )
-
+    pool["actual_wins"] = pool["actual_wins"].fillna(0).astype(int)
+    pool["actual_points"] = pool["actual_points"].fillna(0.0).astype(float)
     pool["actual_matches_in_tournament"] = len(actual)
 
-    pool = pool.drop(
-        columns=[
-            "winner_norm"
-        ],
-        errors="ignore"
-    )
-
-    return pool
+    return pool.drop(columns=["winner_norm"], errors="ignore")
 
 
 
@@ -5422,6 +5383,20 @@ with tab_ideal:
                 hide_index=True
             )
 
+        if actual_pool["actual_points"].sum() <= 0:
+            available_actual_tournaments = sorted(
+                actual_df["tourney_name"].dropna().astype(str).unique().tolist()
+            )
+            st.error(
+                "Nessun risultato reale abbinato al torneo selezionato. "
+                "Il True Ideal Team non può essere calcolato con tutti i punti a zero."
+            )
+            with st.expander("Diagnostica abbinamento torneo"):
+                st.write("Torneo/run richiesto:", run_tournament, run_year)
+                st.write("Chiave normalizzata:", normalize_tournament_name(run_tournament))
+                st.write("Tornei presenti negli Actual Results:", available_actual_tournaments)
+            st.stop()
+
         actual_ideal_team_df, actual_ideal_points, actual_ideal_credits = optimize_team_by_score(
             pool_df=actual_pool,
             score_col="actual_points",
@@ -5562,6 +5537,21 @@ with tab_ideal:
             overlap_players
         )
 
+        expected_players = set(
+            ideal_team_df["player"].astype(str).tolist()
+        )
+        true_ideal_players = set(
+            actual_ideal_team_df["player"].astype(str).tolist()
+        )
+        missed_players = sorted(true_ideal_players - expected_players)
+        selected_but_not_ideal = sorted(expected_players - true_ideal_players)
+        missed_df = actual_pool[
+            actual_pool["player"].astype(str).isin(missed_players)
+        ].copy()
+        selected_not_ideal_df = actual_pool[
+            actual_pool["player"].astype(str).isin(selected_but_not_ideal)
+        ].copy()
+
         # ----------------------------------------------------
         # Capture Rate History
         # ----------------------------------------------------
@@ -5655,20 +5645,9 @@ with tab_ideal:
             )
 
         else:
-
             st.info(
                 "Ideal Backtest calcolato. Premi il pulsante per salvare storico e artifact dettagliati su GitHub."
             )
-
-            capture_saved = save_capture_history(
-                capture_history_df
-            )
-
-            if capture_saved:
-
-                st.success(
-                    "Capture Rate History salvato su GitHub."
-                )
 
         
         st.markdown(
@@ -5954,23 +5933,6 @@ with tab_ideal:
 
         st.markdown(
             "##### Biggest Underestimated Players"
-        )
-
-        # ------------------------------------------------
-        # Save detailed historical artifacts
-        # ------------------------------------------------
-        save_ideal_backtest_artifacts(
-            run_id=selected_run,
-            ideal_pool=ideal_pool,
-            ideal_team_df=ideal_team_df,
-            actual_pool=actual_pool,
-            actual_ideal_team_df=actual_ideal_team_df,
-            missed_df=missed_df,
-            selected_not_ideal_df=selected_not_ideal_df
-        )
-
-        st.success(
-            "Detailed Ideal Backtest artifacts saved to GitHub."
         )
 
         st.dataframe(
