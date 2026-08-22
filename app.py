@@ -1205,6 +1205,7 @@ TOURNAMENT_CANONICAL_MAP = {
     "torontomasters": "canada",
     "montreal": "canada",
     "montrealmasters": "canada",
+    "canadamasters": "canada",
     "canadianmasters": "canada",
 
     # --------------------------------------------------------
