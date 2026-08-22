@@ -1,5 +1,6 @@
-﻿player;credits;expected_points;rank_v13;seed;entry;ioc;real_draw_size;draw_size;bracket_size;r1_match;overall_elo;selected_surface_elo;peak_elo;recent_form;surface_form_60d;same_surface_ratio_60d;fatigue_load;minutes_30d;qualifier_momentum_raw;local_home_raw;matches_in_db;player_norm;actual_wins;actual_points;actual_matches_in_tournament
-Alexander Zverev;28,1;89,28;1;1,0;;GER;128;128;128;1;2114,5;2048,9;2176,5;0,8333333333333334;0,0;0,0;0,3478844521026901;958,0;0,0;0,0;228;alexander zverev;0;0;0
-Felix Auger Aliassime;20,6;77,03;2;2,0;;CAN;128;128;128;64;1972,8;1939,6;2062,7;0,6666666666666666;0,0;0,0;0,1836368936731652;891,0;0,0;1,0;178;felix auger aliassime;0;0;0
-Cameron Norrie;7,0;43,9;16;;;GBR;128;128;128;46;1815,5;1782,4;2028,6;0,4166666666666667;1,0;0,6;0,671702329103536;223,0;0,15;0,0;146;cameron norrie;0;0;0
-Raphael Collignon;3,0;33,96;23;32,0;;BEL;128;128;128;13;1883,0;1831,6;1924,1;0,5833333333333334;0,0;0,0;0,6938823141337358;784,0;0,0499999999999999;0,0;149;raphael collignon;0;0;0
+﻿player;credits;expected_points;rank_v13;seed;entry;ioc;real_draw_size;draw_size;bracket_size;r1_match;overall_elo;selected_surface_elo;peak_elo;recent_form;surface_form_60d;same_surface_ratio_60d;fatigue_load;minutes_30d;qualifier_momentum_raw;local_home_raw;matches_in_db;player_norm;actual_matches_in_tournament;actual_wins;actual_points
+Daniil Medvedev;16,3;73,52;2;4,0;;;128;128;128;17;1957,2;1944,0;2201,2;0,5833333333333334;0,3333333333333333;0,5;1,1527308359938178;376,0;-0,05;0,0;265;daniil medvedev;95;0;0,0
+Alex De Minaur;17,6;69,51;3;3,0;;AUS;128;128;128;48;1946,3;1918,3;2053,1;0,6666666666666666;0,625;0,6666666666666666;1,833080184775092;932,0;0,0;0,0;275;alex de minaur;95;1;25,0
+Andrey Rublev;12,8;59,91;7;10,0;;;128;128;128;56;1889,2;1834,7;2122,1;0,5;0,3333333333333333;0,3;0,6086452432186537;522,0;-0,05;0,0;256;andrey rublev;95;0;0,0
+Jiri Lehecka;11,5;52,57;9;8,0;;CZE;128;128;128;33;1921,4;1870,4;1989,9;0,5833333333333334;0,5;0,6;0,9624073943328324;619,0;0,0299999999999999;0,0;218;jiri lehecka;95;2;50,0
+Flavio Cobolli;11,5;51,92;10;6,0;;ITA;128;128;128;49;1883,7;1794,0;1931,6;0,6666666666666666;0,8;0,4545454545454545;1,960328746771796;666,0;0,09;0,0;274;flavio cobolli;95;0;0,0
