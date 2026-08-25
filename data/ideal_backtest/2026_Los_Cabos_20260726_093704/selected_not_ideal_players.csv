@@ -1,3 +1,4 @@
-﻿player;credits;expected_points;rank_v13;seed;entry;ioc;real_draw_size;draw_size;bracket_size;r1_match;overall_elo;selected_surface_elo;peak_elo;recent_form;surface_form_60d;same_surface_ratio_60d;fatigue_load;minutes_30d;qualifier_momentum_raw;local_home_raw;matches_in_db;player_norm;actual_wins;actual_points;actual_matches_in_tournament
-Francisco Cerundolo;12,4;55,25;2;3,0;;ARG;32;32;32;5;1915,1;1872,1;1961,6;0,6666666666666666;0,0;0,0;-0,2381281566461771;105,0;0,0;0,0;234;francisco cerundolo;0;0;0
-Michael Zheng;1,0;27,85;9;;;USA;32;32;32;8;1771,4;1709,6;1777,3;0,75;1,0;0,2727272727272727;1,4858677700871;1239,0;0,15;0,0;72;michael zheng;0;0;0
+﻿player;credits;expected_points;rank_v13;seed;entry;ioc;real_draw_size;draw_size;bracket_size;r1_match;overall_elo;selected_surface_elo;peak_elo;recent_form;surface_form_60d;same_surface_ratio_60d;fatigue_load;minutes_30d;qualifier_momentum_raw;local_home_raw;matches_in_db;player_norm;actual_matches_in_tournament;actual_wins;actual_points
+Jiri Lehecka;11,3;58,33;1;1,0;;CZE;32;32;32;1;1921,2;1869,9;1989,9;0,5833333333333334;0,0;0,0;0,2447832545362312;605,0;0,0499999999999999;0,0;149;jiri lehecka;27;0;0,0
+Francisco Cerundolo;10,6;57,7;3;3,0;;ARG;32;32;32;5;1875,0;1823,4;1961,6;0,6666666666666666;0,0;0,0;-0,2289279153188294;105,0;0,0;0,0;169;francisco cerundolo;27;1;25,0
+Karen Khachanov;10,5;45,26;4;4,0;;;32;32;32;12;1790,8;1741,6;2029,5;0,5833333333333334;0,0;0,0;0,1341310829456938;546,0;0,0;0,0;146;karen khachanov;27;0;0,0
