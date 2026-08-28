@@ -1250,6 +1250,8 @@ TOURNAMENT_CANONICAL_MAP = {
     "hertogenbosch": "hertogenbosch",
     "sherogenbosch": "hertogenbosch",
 
+    "winston-salem": "winstonsalem",
+
     # --------------------------------------------------------
     # Tornei che normalmente coincidono già
     # --------------------------------------------------------
@@ -1287,8 +1289,7 @@ TOURNAMENT_CANONICAL_MAP = {
     "tokyo": "tokyo",
     "umag": "umag",
     "vienna": "vienna",
-    "washington": "washington",
-    "winstonsalem": "winstonsalem",
+    "washington": "washington",  
 }
 
 
