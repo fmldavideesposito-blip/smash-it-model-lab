@@ -1105,22 +1105,31 @@ def build_prediction_vs_actual_global(
 
 def filter_actuals_by_tournament(
     actual_df: pd.DataFrame,
-    tournament_filter: str
+    tournament_filter: str,
 ):
     """
-    Filtra actual_df per torneo se richiesto.
-    """
+    Filtra gli actual utilizzando la chiave canonica del torneo.
 
+    Il confronto non dipende più dalla grafia esatta del nome, quindi
+    Winston-Salem, Winston Salem e Winston Salem Open vengono trattati
+    come lo stesso torneo.
+    """
     if tournament_filter == "All Tournaments":
         return actual_df.copy()
 
     if "tourney_name" not in actual_df.columns:
         return actual_df.copy()
 
-    return actual_df[
-        actual_df["tourney_name"].astype(str)
-        == tournament_filter
-    ].copy()
+    requested_key = normalize_tournament_name(tournament_filter)
+
+    actual_keys = (
+        actual_df["tourney_name"]
+        .astype(str)
+        .apply(normalize_tournament_name)
+    )
+
+    return actual_df[actual_keys == requested_key].copy()
+
 
 # ------------------------------------------------------------
 # Tournament Mapping
@@ -1250,7 +1259,11 @@ TOURNAMENT_CANONICAL_MAP = {
     "hertogenbosch": "hertogenbosch",
     "sherogenbosch": "hertogenbosch",
 
-    "winston-salem": "winstonsalem",
+    # Winston-Salem aliases
+    "winstonsalem": "winstonsalem",
+    "winstonsalemopen": "winstonsalem",
+    "atpwinstonsalem": "winstonsalem",
+    "winstonsalematp": "winstonsalem",
 
     # --------------------------------------------------------
     # Tornei che normalmente coincidono già
@@ -1297,14 +1310,66 @@ def normalize_tournament_name(name):
     """
     Normalizza il nome torneo usando una chiave canonica comune
     tra Optimizer e TennisMyLife.
-    """
 
+    Gestisce:
+    - maiuscole, accenti, spazi, trattini e punteggiatura;
+    - alias espliciti definiti in TOURNAMENT_CANONICAL_MAP;
+    - varianti con prefissi/suffissi generici come ATP, Open,
+      Tennis, Tournament e Championships.
+    """
     key = normalize_text_key(name)
 
-    return TOURNAMENT_CANONICAL_MAP.get(
-        key,
-        key
+    if not key:
+        return ""
+
+    # Priorità assoluta agli alias espliciti.
+    if key in TOURNAMENT_CANONICAL_MAP:
+        return TOURNAMENT_CANONICAL_MAP[key]
+
+    # Alcune fonti aggiungono ATP all'inizio del nome.
+    prefix_candidates = [key]
+    if key.startswith("atp") and len(key) > 3:
+        prefix_candidates.append(key[3:])
+
+    generic_suffixes = (
+        "championships",
+        "championship",
+        "tournament",
+        "tennis",
+        "masters",
+        "master",
+        "open",
+        "atp",
     )
+
+    for candidate in prefix_candidates:
+        simplified_key = candidate
+        changed = True
+
+        while changed:
+            changed = False
+
+            if simplified_key in TOURNAMENT_CANONICAL_MAP:
+                return TOURNAMENT_CANONICAL_MAP[simplified_key]
+
+            for suffix in generic_suffixes:
+                if (
+                    simplified_key.endswith(suffix)
+                    and len(simplified_key) > len(suffix)
+                ):
+                    simplified_key = simplified_key[:-len(suffix)]
+                    changed = True
+                    break
+
+        if simplified_key in TOURNAMENT_CANONICAL_MAP:
+            return TOURNAMENT_CANONICAL_MAP[simplified_key]
+
+        # Winston-Salem deve essere ricondotto alla stessa chiave anche
+        # quando la fonte aggiunge parole non previste.
+        if "winstonsalem" in simplified_key:
+            return "winstonsalem"
+
+    return key
 
 def build_tournament_mapping(pred_df, actual_df):
     """
