@@ -838,6 +838,59 @@ def find_tml_season_url(catalog_df: pd.DataFrame, year: int):
     return None, None
 
 
+
+def find_tml_ongoing_url(catalog_df: pd.DataFrame):
+    """
+    Trova nel catalogo TennisMyLife il file ATP ongoing_tourneys.csv.
+
+    Esclude i file Challenger e restituisce:
+    - URL del file;
+    - nome del file.
+    """
+    if catalog_df is None or catalog_df.empty:
+        return None, None
+
+    required_columns = {"name", "url"}
+    if not required_columns.issubset(catalog_df.columns):
+        return None, None
+
+    names = (
+        catalog_df["name"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    preferred_names = (
+        "ongoing_tourneys.csv",
+        "ongoing_tournaments.csv",
+        "atp_ongoing_tourneys.csv",
+    )
+
+    for preferred_name in preferred_names:
+        exact = catalog_df[names.eq(preferred_name)].copy()
+        if not exact.empty:
+            row = exact.iloc[0]
+            return row["url"], row["name"]
+
+    fallback = catalog_df[
+        names.str.contains("ongoing", case=False, na=False)
+        & names.str.endswith(".csv", na=False)
+        & ~names.str.contains(
+            "challenger|ch_ongoing|ongoing_ch",
+            case=False,
+            na=False,
+            regex=True,
+        )
+    ].copy()
+
+    if not fallback.empty:
+        row = fallback.iloc[0]
+        return row["url"], row["name"]
+
+    return None, None
+
 def get_years_from_prediction_data():
     """
     Estrae gli anni disponibili dal Prediction Warehouse o dal singolo prediction_log.
@@ -1105,31 +1158,22 @@ def build_prediction_vs_actual_global(
 
 def filter_actuals_by_tournament(
     actual_df: pd.DataFrame,
-    tournament_filter: str,
+    tournament_filter: str
 ):
     """
-    Filtra gli actual utilizzando la chiave canonica del torneo.
-
-    Il confronto non dipende più dalla grafia esatta del nome, quindi
-    Winston-Salem, Winston Salem e Winston Salem Open vengono trattati
-    come lo stesso torneo.
+    Filtra actual_df per torneo se richiesto.
     """
+
     if tournament_filter == "All Tournaments":
         return actual_df.copy()
 
     if "tourney_name" not in actual_df.columns:
         return actual_df.copy()
 
-    requested_key = normalize_tournament_name(tournament_filter)
-
-    actual_keys = (
-        actual_df["tourney_name"]
-        .astype(str)
-        .apply(normalize_tournament_name)
-    )
-
-    return actual_df[actual_keys == requested_key].copy()
-
+    return actual_df[
+        actual_df["tourney_name"].astype(str)
+        == tournament_filter
+    ].copy()
 
 # ------------------------------------------------------------
 # Tournament Mapping
@@ -1307,68 +1351,38 @@ TOURNAMENT_CANONICAL_MAP = {
 
 
 def normalize_tournament_name(name):
-    """
-    Normalizza il nome torneo usando una chiave canonica comune
-    tra Optimizer e TennisMyLife.
-
-    Gestisce:
-    - maiuscole, accenti, spazi, trattini e punteggiatura;
-    - alias espliciti definiti in TOURNAMENT_CANONICAL_MAP;
-    - varianti con prefissi/suffissi generici come ATP, Open,
-      Tennis, Tournament e Championships.
-    """
+    """Normalizza il nome torneo tra Optimizer e TennisMyLife."""
     key = normalize_text_key(name)
-
     if not key:
         return ""
-
-    # Priorità assoluta agli alias espliciti.
     if key in TOURNAMENT_CANONICAL_MAP:
         return TOURNAMENT_CANONICAL_MAP[key]
 
-    # Alcune fonti aggiungono ATP all'inizio del nome.
-    prefix_candidates = [key]
+    candidates = [key]
     if key.startswith("atp") and len(key) > 3:
-        prefix_candidates.append(key[3:])
+        candidates.append(key[3:])
 
     generic_suffixes = (
-        "championships",
-        "championship",
-        "tournament",
-        "tennis",
-        "masters",
-        "master",
-        "open",
-        "atp",
+        "championships", "championship", "tournament", "tennis",
+        "masters", "master", "open", "atp",
     )
 
-    for candidate in prefix_candidates:
-        simplified_key = candidate
+    for candidate in candidates:
+        simplified = candidate
         changed = True
-
         while changed:
             changed = False
-
-            if simplified_key in TOURNAMENT_CANONICAL_MAP:
-                return TOURNAMENT_CANONICAL_MAP[simplified_key]
-
+            if simplified in TOURNAMENT_CANONICAL_MAP:
+                return TOURNAMENT_CANONICAL_MAP[simplified]
             for suffix in generic_suffixes:
-                if (
-                    simplified_key.endswith(suffix)
-                    and len(simplified_key) > len(suffix)
-                ):
-                    simplified_key = simplified_key[:-len(suffix)]
+                if simplified.endswith(suffix) and len(simplified) > len(suffix):
+                    simplified = simplified[:-len(suffix)]
                     changed = True
                     break
-
-        if simplified_key in TOURNAMENT_CANONICAL_MAP:
-            return TOURNAMENT_CANONICAL_MAP[simplified_key]
-
-        # Winston-Salem deve essere ricondotto alla stessa chiave anche
-        # quando la fonte aggiunge parole non previste.
-        if "winstonsalem" in simplified_key:
+        if simplified in TOURNAMENT_CANONICAL_MAP:
+            return TOURNAMENT_CANONICAL_MAP[simplified]
+        if "winstonsalem" in simplified:
             return "winstonsalem"
-
     return key
 
 def build_tournament_mapping(pred_df, actual_df):
@@ -1859,26 +1873,36 @@ def build_prediction_vs_actual_tournament(
     # --------------------------------------------------------
     # Anno actual
     # --------------------------------------------------------
-    if "source_year" in actual_base.columns:
-        actual_base["actual_year"] = pd.to_numeric(
-            actual_base["source_year"],
-            errors="coerce"
-        ).fillna(0).astype(int)
+    actual_year_series = pd.Series(
+        pd.NA,
+        index=actual_base.index,
+        dtype="Float64",
+    )
 
-    elif "tourney_date" in actual_base.columns:
-        actual_base["actual_year"] = (
+    if "source_year" in actual_base.columns:
+        source_year_values = pd.to_numeric(
+            actual_base["source_year"],
+            errors="coerce",
+        )
+        actual_year_series = actual_year_series.fillna(source_year_values)
+
+    if "tourney_date" in actual_base.columns:
+        date_digits = (
             actual_base["tourney_date"]
             .astype(str)
-            .str.slice(0, 4)
+            .str.replace(r"\D", "", regex=True)
         )
+        date_year_values = pd.to_numeric(
+            date_digits.str[:4],
+            errors="coerce",
+        )
+        actual_year_series = actual_year_series.fillna(date_year_values)
 
-        actual_base["actual_year"] = pd.to_numeric(
-            actual_base["actual_year"],
-            errors="coerce"
-        ).fillna(0).astype(int)
-
-    else:
-        actual_base["actual_year"] = 0
+    actual_base["actual_year"] = (
+        pd.to_numeric(actual_year_series, errors="coerce")
+        .fillna(0)
+        .astype(int)
+    )
 
     # --------------------------------------------------------
     # Aggregate prediction by tournament / strategy / player
@@ -2501,23 +2525,30 @@ def build_actual_points_for_pool(
 
     if actual_year is not None and str(actual_year) != "All Years":
         requested_year = pd.to_numeric(actual_year, errors="coerce")
+        actual_year_series = pd.Series(
+            pd.NA,
+            index=actual.index,
+            dtype="Float64",
+        )
+
         if "source_year" in actual.columns:
-            actual_year_series = pd.to_numeric(
-                actual["source_year"], errors="coerce"
+            source_year_values = pd.to_numeric(
+                actual["source_year"],
+                errors="coerce",
             )
-        elif "tourney_date" in actual.columns:
+            actual_year_series = actual_year_series.fillna(source_year_values)
+
+        if "tourney_date" in actual.columns:
             date_digits = (
                 actual["tourney_date"]
                 .astype(str)
                 .str.replace(r"\D", "", regex=True)
             )
-            actual_year_series = pd.to_numeric(
-                date_digits.str[:4], errors="coerce"
+            date_year_values = pd.to_numeric(
+                date_digits.str[:4],
+                errors="coerce",
             )
-        else:
-            actual_year_series = pd.Series(
-                pd.NA, index=actual.index, dtype="Float64"
-            )
+            actual_year_series = actual_year_series.fillna(date_year_values)
 
         if pd.notna(requested_year):
             actual = actual[
@@ -3330,6 +3361,99 @@ with tab_actual:
                                 "file": file_name,
                                 "status": "loaded",
                                 "rows": len(year_df),
+                            }
+                        )
+
+                    # --------------------------------------------------------
+                    # Caricamento risultati ATP ongoing
+                    # --------------------------------------------------------
+                    ongoing_url, ongoing_file_name = find_tml_ongoing_url(
+                        catalog_df
+                    )
+
+                    if ongoing_url:
+                        try:
+                            with st.spinner(
+                                f"Loading TennisMyLife {ongoing_file_name}..."
+                            ):
+                                ongoing_df = download_tml_csv_from_url(
+                                    ongoing_url
+                                )
+
+                            if ongoing_df is not None and not ongoing_df.empty:
+                                ongoing_df = ongoing_df.copy()
+
+                                if "tourney_date" in ongoing_df.columns:
+                                    ongoing_date_digits = (
+                                        ongoing_df["tourney_date"]
+                                        .astype(str)
+                                        .str.replace(r"\D", "", regex=True)
+                                    )
+                                    ongoing_df["source_year"] = pd.to_numeric(
+                                        ongoing_date_digits.str[:4],
+                                        errors="coerce",
+                                    )
+                                else:
+                                    ongoing_df["source_year"] = (
+                                        pd.Timestamp.today().year
+                                    )
+
+                                selected_year_values = [
+                                    int(year_value)
+                                    for year_value in selected_years
+                                ]
+
+                                ongoing_df = ongoing_df[
+                                    pd.to_numeric(
+                                        ongoing_df["source_year"],
+                                        errors="coerce",
+                                    ).isin(selected_year_values)
+                                ].copy()
+
+                                ongoing_df["source_file"] = ongoing_file_name
+                                ongoing_df["source_url"] = ongoing_url
+
+                                if not ongoing_df.empty:
+                                    loaded_actuals.append(ongoing_df)
+
+                                    ongoing_years = sorted(
+                                        ongoing_df["source_year"]
+                                        .dropna()
+                                        .astype(int)
+                                        .unique()
+                                        .tolist()
+                                    )
+
+                                    load_report.append(
+                                        {
+                                            "year": "/".join(
+                                                map(str, ongoing_years)
+                                            ),
+                                            "file": ongoing_file_name,
+                                            "status": "ongoing loaded",
+                                            "rows": len(ongoing_df),
+                                        }
+                                    )
+
+                        except Exception as exc:
+                            load_report.append(
+                                {
+                                    "year": "",
+                                    "file": (
+                                        ongoing_file_name
+                                        or "ongoing_tourneys.csv"
+                                    ),
+                                    "status": f"ongoing error: {exc}",
+                                    "rows": 0,
+                                }
+                            )
+                    else:
+                        load_report.append(
+                            {
+                                "year": "",
+                                "file": "ongoing_tourneys.csv",
+                                "status": "ongoing not found",
+                                "rows": 0,
                             }
                         )
 
