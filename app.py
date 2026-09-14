@@ -1789,6 +1789,57 @@ def build_predicted_players_actual_match(
     return match_df, unmatched_df
 
 # ------------------------------------------------------------
+# V17.0 - Ex-post evaluation framework
+# ------------------------------------------------------------
+ROUND_ORDER = {"R128": 1, "R64": 2, "R32": 3, "R16": 4, "QF": 5, "SF": 6, "F": 7, "W": 8}
+SLAM_KEYS = {"australianopen", "rolandgarros", "wimbledon", "usopen"}
+ATP1000_KEYS = {"indianwells", "miami", "montecarlo", "madrid", "rome", "canada", "cincinnati", "shanghai", "paris"}
+ATP500_KEYS = {"rotterdam", "doha", "dubai", "barcelona", "hamburg", "halle", "queens", "washington", "beijing", "tokyo", "vienna", "basel"}
+
+def normalize_round_code(value):
+    text = str(value or "").upper().strip().replace("ROUND OF ", "R")
+    aliases = {"128": "R128", "64": "R64", "32": "R32", "16": "R16", "QUARTERFINAL": "QF", "QUARTERFINALS": "QF", "SEMIFINAL": "SF", "SEMIFINALS": "SF", "FINAL": "F"}
+    return aliases.get(text, text if text in ROUND_ORDER else "")
+
+def infer_tournament_category(tournament_name, actual_tournament_df=None):
+    key = normalize_tournament_name(tournament_name)
+    if key in SLAM_KEYS: return "GRAND_SLAM"
+    if key in ATP1000_KEYS: return "ATP1000"
+    if key in ATP500_KEYS: return "ATP500"
+    return "ATP250_OR_500"
+
+def minimum_target_round(category):
+    return "QF" if category in {"GRAND_SLAM", "ATP1000"} else "SF"
+
+def actual_player_outcome(actual_tournament_df, player_norm):
+    if actual_tournament_df is None or actual_tournament_df.empty:
+        return {"actual_wins": 0, "actual_losses": 0, "actual_matches_played": 0, "actual_best_round": ""}
+    wins_df = actual_tournament_df[actual_tournament_df["winner_norm"] == player_norm].copy()
+    losses_df = actual_tournament_df[actual_tournament_df["loser_norm"] == player_norm].copy()
+    wins, losses = len(wins_df), len(losses_df)
+    best_round = ""
+    if not losses_df.empty and "round" in losses_df.columns:
+        rounds = [normalize_round_code(x) for x in losses_df["round"].tolist()]
+        rounds = [x for x in rounds if x]
+        if rounds: best_round = max(rounds, key=lambda x: ROUND_ORDER.get(x, 0))
+    elif wins > 0 and "round" in wins_df.columns:
+        rounds = [normalize_round_code(x) for x in wins_df["round"].tolist()]
+        rounds = [x for x in rounds if x]
+        if "F" in rounds:
+            best_round = "W"
+        elif rounds:
+            highest = max(rounds, key=lambda x: ROUND_ORDER.get(x, 0))
+            best_round = {"R128":"R64", "R64":"R32", "R32":"R16", "R16":"QF", "QF":"SF", "SF":"F"}.get(highest, highest)
+    return {"actual_wins": wins, "actual_losses": losses, "actual_matches_played": wins + losses, "actual_best_round": best_round}
+
+def classify_ex_post(actual_points, expected_points, target_reached):
+    ratio = actual_points / expected_points if expected_points > 0 else float("nan")
+    if target_reached and ratio >= 1.0: return "Full success"
+    if target_reached or ratio >= 0.75: return "Acceptable"
+    if ratio >= 0.50: return "Below expectations"
+    return "Failure"
+
+# ------------------------------------------------------------
 # Prediction vs Actual by Tournament
 # ------------------------------------------------------------
 def build_prediction_vs_actual_tournament(
@@ -1968,33 +2019,18 @@ def build_prediction_vs_actual_tournament(
         # ----------------------------------------------------
         # Calcola wins nel torneo
         # ----------------------------------------------------
-        wins = int(
-            (
-                actual_tournament_df["winner_norm"]
-                == pred_player_norm
-            ).sum()
-        )
-
-        if "loser_norm" in actual_tournament_df.columns:
-            losses = int(
-                (
-                    actual_tournament_df["loser_norm"]
-                    == pred_player_norm
-                ).sum()
-            )
-        else:
-            losses = 0
-
-        matches_played = wins + losses
+        outcome = actual_player_outcome(actual_tournament_df, pred_player_norm)
+        wins = int(outcome["actual_wins"])
+        losses = int(outcome["actual_losses"])
+        matches_played = int(outcome["actual_matches_played"])
+        actual_best_round = outcome["actual_best_round"]
+        category = infer_tournament_category(pred_tournament, actual_tournament_df)
+        target_round = minimum_target_round(category)
+        target_reached = ROUND_ORDER.get(actual_best_round, 0) >= ROUND_ORDER.get(target_round, 99)
         actual_points = wins * POINTS_PER_WIN
-
         prediction_error = actual_points - expected_points
-
-        efficiency_ratio = (
-            actual_points / expected_points
-            if expected_points > 0
-            else 0
-        )
+        efficiency_ratio = actual_points / expected_points if expected_points > 0 else float("nan")
+        performance_class = classify_ex_post(actual_points, expected_points, target_reached)
 
         rounds_won = ""
 
@@ -2027,7 +2063,12 @@ def build_prediction_vs_actual_tournament(
                 "actual_matches_played": matches_played,
                 "actual_points": round(actual_points, 2),
                 "prediction_error": round(prediction_error, 2),
-                "efficiency_ratio": round(efficiency_ratio, 3),
+                "efficiency_ratio": round(efficiency_ratio, 3) if pd.notna(efficiency_ratio) else pd.NA,
+                "actual_best_round": actual_best_round,
+                "tournament_category": category,
+                "minimum_target_round": target_round,
+                "minimum_target_reached": bool(target_reached),
+                "performance_class": performance_class,
                 "rounds_won": rounds_won,
                 "matched_actual_tournament": (
                     actual_tournament_df["tourney_name"].iloc[0]
@@ -2063,10 +2104,12 @@ def build_prediction_vs_actual_tournament(
             expected_points=("expected_points", "sum"),
             actual_points=("actual_points", "sum"),
             actual_wins=("actual_wins", "sum"),
-            prediction_error=("prediction_error", "sum")
+            prediction_error=("prediction_error", "sum"),
+            deep_run_hits=("minimum_target_reached", "sum")
         )
         .reset_index()
     )
+    summary_df["deep_run_hit_rate"] = summary_df["deep_run_hits"] / summary_df["players"].replace(0, pd.NA)
 
     summary_df["efficiency_ratio"] = (
         summary_df["actual_points"]
@@ -2178,6 +2221,11 @@ def enrich_prediction_warehouse_with_actuals(
             "actual_matches_in_tournament",
             "prediction_error",
             "efficiency_ratio",
+            "actual_best_round",
+            "tournament_category",
+            "minimum_target_round",
+            "minimum_target_reached",
+            "performance_class",
             "rounds_won"
         ]
         if c in detail.columns
@@ -2249,6 +2297,11 @@ def enrich_prediction_warehouse_with_actuals(
     overwrite_from_backtest("actual_matches_in_tournament", "actual_matches_in_tournament_bt")
     overwrite_from_backtest("prediction_error", "prediction_error_bt")
     overwrite_from_backtest("efficiency_ratio", "efficiency_ratio_bt")
+    overwrite_from_backtest("actual_best_round", "actual_best_round_bt")
+    overwrite_from_backtest("tournament_category", "tournament_category_bt")
+    overwrite_from_backtest("minimum_target_round", "minimum_target_round_bt")
+    overwrite_from_backtest("minimum_target_reached", "minimum_target_reached_bt")
+    overwrite_from_backtest("performance_class", "performance_class_bt")
 
     # --------------------------------------------------------
     # actual_best_round deriva da rounds_won
@@ -2583,8 +2636,22 @@ def build_actual_points_for_pool(
     )
     pool["actual_wins"] = pool["actual_wins"].fillna(0).astype(int)
     pool["actual_points"] = pool["actual_points"].fillna(0.0).astype(float)
+    actual["loser_norm"] = actual.get("loser_name", pd.Series("", index=actual.index)).apply(normalize_player_name)
+    category = infer_tournament_category(actual_tournament, actual)
+    target_round = minimum_target_round(category)
+    outcome_rows = []
+    for _, pool_row in pool.iterrows():
+        outcome = actual_player_outcome(actual, pool_row["player_norm"])
+        best_round = outcome["actual_best_round"]
+        target_reached = ROUND_ORDER.get(best_round, 0) >= ROUND_ORDER.get(target_round, 99)
+        expected = pd.to_numeric(pool_row.get("expected_points", 0), errors="coerce")
+        expected = 0.0 if pd.isna(expected) else float(expected)
+        actual_pts = float(pool_row.get("actual_points", 0))
+        outcome_rows.append({"actual_best_round": best_round, "tournament_category": category, "minimum_target_round": target_round, "minimum_target_reached": bool(target_reached), "prediction_error": actual_pts - expected, "efficiency_ratio": actual_pts / expected if expected > 0 else pd.NA, "performance_class": classify_ex_post(actual_pts, expected, target_reached)})
+    if outcome_rows:
+        outcome_df = pd.DataFrame(outcome_rows, index=pool.index)
+        for col in outcome_df.columns: pool[col] = outcome_df[col]
     pool["actual_matches_in_tournament"] = len(actual)
-
     return pool.drop(columns=["winner_norm"], errors="ignore")
 
 
@@ -4402,7 +4469,7 @@ with tab_backtest:
 # ------------------------------------------------------------
 with tab_calibration:
 
-    st.subheader("Weight Calibration Lab")
+    st.subheader("Calibration and Double-Counting Lab")
 
     if "prediction_log_master_enriched" not in st.session_state:
 
@@ -4521,7 +4588,7 @@ with tab_calibration:
             ].copy()
 
             st.caption(
-                "Calibration is currently based only on: 1. Optimized Team"
+                "Calibration is based only on 1. Optimized Team and is selection-biased. Use ranking_completo.csv for full-field analysis."
             )
 
         if len(training_df) == 0:
@@ -4673,7 +4740,7 @@ with tab_dream:
             ).iloc[0]
         )
 
-        budget = int(
+        budget = float(
             pd.to_numeric(
                 run_df["budget"],
                 errors="coerce"
@@ -5242,7 +5309,7 @@ with tab_ideal:
             ).iloc[0]
         )
 
-        budget = int(
+        budget = float(
             pd.to_numeric(
                 run_df["budget"],
                 errors="coerce"
@@ -5369,11 +5436,18 @@ with tab_ideal:
         # ----------------------------------------------------
         # Expected Team Optimizer Check
         # ----------------------------------------------------
-        ideal_team_df, ideal_points = optimize_expected_team(
-            ideal_pool,
-            budget=budget,
-            team_size=team_size
-        )
+        # Valuta la squadra realmente suggerita nel run, non una ricostruzione ex post.
+        optimized_run_df = run_df[run_df["strategy"].astype(str) == "1. Optimized Team"].copy()
+        optimized_run_df["player_norm_join"] = optimized_run_df["player"].apply(normalize_player_name)
+        pool_for_join = ideal_pool.copy()
+        pool_for_join["player_norm_join"] = pool_for_join["player"].apply(normalize_player_name)
+        ideal_team_df = pool_for_join[pool_for_join["player_norm_join"].isin(optimized_run_df["player_norm_join"])].copy()
+        run_values = optimized_run_df[["player_norm_join", "expected_points", "credits"]].rename(columns={"expected_points":"run_expected_points", "credits":"run_credits"})
+        ideal_team_df = ideal_team_df.merge(run_values, on="player_norm_join", how="left")
+        ideal_team_df["expected_points"] = pd.to_numeric(ideal_team_df["run_expected_points"], errors="coerce").fillna(ideal_team_df["expected_points"])
+        ideal_team_df["credits"] = pd.to_numeric(ideal_team_df["run_credits"], errors="coerce").fillna(ideal_team_df["credits"])
+        ideal_team_df = ideal_team_df.drop(columns=["run_expected_points", "run_credits"], errors="ignore")
+        ideal_points = float(ideal_team_df["expected_points"].sum())
 
         with st.expander("DEBUG Solver"):
 
@@ -5655,11 +5729,9 @@ with tab_ideal:
         # ----------------------------------------------------
         # Gap Analysis
         # ----------------------------------------------------
-        expected_team_with_actuals = actual_pool[
-            actual_pool["player"].isin(
-                ideal_team_df["player"].tolist()
-            )
-        ].copy()
+        actual_pool["player_norm_eval"] = actual_pool["player"].apply(normalize_player_name)
+        expected_norms = set(ideal_team_df["player"].apply(normalize_player_name))
+        expected_team_with_actuals = actual_pool[actual_pool["player_norm_eval"].isin(expected_norms)].copy()
 
         expected_team_actual_points = (
             expected_team_with_actuals["actual_points"]
